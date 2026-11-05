@@ -1,0 +1,3693 @@
+name: Build AllCore APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
+
+      - name: Create AllCore project files
+        run: |
+          mkdir -p app
+          mkdir -p app/src/main
+          mkdir -p app/src/main/java/com/allcore/emulator
+          mkdir -p app/src/main/java/com/allcore/emulator/data
+          mkdir -p app/src/main/java/com/allcore/emulator/emulator
+          mkdir -p app/src/main/java/com/allcore/emulator/ui
+          mkdir -p app/src/main/java/com/allcore/emulator/util
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+
+          cat << 'EOF' > settings.gradle.kts
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "AllCore"
+          include(":app")
+          EOF
+
+          cat << 'EOF' > build.gradle.kts
+          plugins {
+              id("com.android.application") version "8.2.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+              id("com.google.devtools.ksp") version "1.9.22-1.0.17" apply false
+          }
+          EOF
+
+          cat << 'EOF' > gradle.properties
+          org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          kotlin.code.style=official
+          EOF
+
+          cat << 'EOF' > app/build.gradle.kts
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+              id("com.google.devtools.ksp")
+          }
+
+          android {
+              namespace = "com.allcore.emulator"
+              compileSdk = 34
+
+              defaultConfig {
+                  applicationId = "com.allcore.emulator"
+                  minSdk = 26
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+
+              buildFeatures {
+                  compose = true
+              }
+
+              composeOptions {
+                  kotlinCompilerExtensionVersion = "1.5.10"
+              }
+
+              packaging {
+                  resources {
+                      excludes += "/META-INF/{AL2.0,LGPL2.1}"
+                  }
+              }
+          }
+
+          dependencies {
+              implementation("androidx.core:core-ktx:1.12.0")
+              implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+              implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+              implementation("androidx.activity:activity-compose:1.8.2")
+              implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+              implementation("androidx.compose.ui:ui")
+              implementation("androidx.compose.foundation:foundation")
+              implementation("androidx.compose.animation:animation")
+              implementation("androidx.compose.material3:material3")
+              implementation("androidx.compose.material:material-icons-extended")
+              implementation("androidx.room:room-runtime:2.6.1")
+              implementation("androidx.room:room-ktx:2.6.1")
+              ksp("androidx.room:room-compiler:2.6.1")
+              implementation("io.coil-kt:coil-compose:2.5.0")
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission
+                  android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+                  tools:ignore="ScopedStorage" />
+              <uses-permission
+                  android:name="android.permission.READ_EXTERNAL_STORAGE"
+                  android:maxSdkVersion="32" />
+              <uses-permission
+                  android:name="android.permission.QUERY_ALL_PACKAGES"
+                  tools:ignore="QueryAllPackagesPermission" />
+              <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+              <queries>
+                  <package android:name="org.ppsspp.ppsspp" />
+                  <package android:name="com.retroarch" />
+                  <package android:name="com.github.stenzek.duckstation" />
+                  <package android:name="xyz.aethersx2.android" />
+                  <package android:name="com.winlator" />
+                  <package android:name="com.armsx3.play" />
+                  <package android:name="aenu.ax360e.free" />
+                  <package android:name="org.dolphinemu.dolphinemu" />
+                  <package android:name="com.lighttouch" />
+              </queries>
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="AllCore"
+                  android:theme="@style/Theme.AllCore"
+                  android:hardwareAccelerated="true"
+                  android:usesCleartextTraffic="true"
+                  android:supportsRtl="true"
+                  android:requestLegacyExternalStorage="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:screenOrientation="sensorLandscape"
+                      android:windowSoftInputMode="adjustResize"
+                      android:configChanges="orientation|screenSize|keyboardHidden|keyboard|smallestScreenSize|screenLayout|uiMode|density">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+
+                  <provider
+                      android:name="androidx.core.content.FileProvider"
+                      android:authorities="com.allcore.emulator.fileprovider"
+                      android:exported="false"
+                      android:grantUriPermissions="true">
+                      <meta-data
+                          android:name="android.support.FILE_PROVIDER_PATHS"
+                          android:resource="@xml/file_paths" />
+                  </provider>
+              </application>
+          </manifest>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/values/themes.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="Theme.AllCore" parent="android:Theme.Material.NoActionBar">
+                  <item name="android:windowBackground">@android:color/black</item>
+                  <item name="android:statusBarColor">@android:color/black</item>
+                  <item name="android:navigationBarColor">@android:color/black</item>
+                  <item name="android:windowFullscreen">true</item>
+              </style>
+          </resources>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/values/strings.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">AllCore</string>
+          </resources>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/xml/file_paths.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths>
+              <external-path name="external" path="." />
+              <external-files-path name="external_files" path="." />
+              <files-path name="files" path="." />
+          </paths>
+          EOF
+
+          cat << 'EOF' > app/src/main/res/drawable/ic_launcher.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="96dp"
+              android:height="96dp"
+              android:viewportWidth="96"
+              android:viewportHeight="96">
+              <path
+                  android:fillColor="#05070D"
+                  android:pathData="M0,0h96v96h-96z" />
+              <path
+                  android:fillColor="#00000000"
+                  android:strokeColor="#3DE0FF"
+                  android:strokeWidth="5"
+                  android:pathData="M48,14 L77,31 L77,65 L48,82 L19,65 L19,31 Z" />
+              <path
+                  android:fillColor="#2F7BFF"
+                  android:pathData="M48,34 L63,43 L63,59 L48,68 L33,59 L33,43 Z" />
+          </vector>
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/MainActivity.kt
+          package com.allcore.emulator
+
+          import android.os.Build
+          import android.os.Bundle
+          import android.view.WindowManager
+          import androidx.activity.ComponentActivity
+          import androidx.activity.compose.setContent
+          import androidx.activity.viewModels
+          import androidx.core.view.WindowCompat
+          import androidx.core.view.WindowInsetsCompat
+          import androidx.core.view.WindowInsetsControllerCompat
+          import com.allcore.emulator.data.GameViewModel
+          import com.allcore.emulator.ui.AllCoreApp
+          import com.allcore.emulator.ui.AllCoreTheme
+          import com.allcore.emulator.util.AmbientMusic
+          import com.allcore.emulator.util.Prefs
+          import com.allcore.emulator.util.Sfx
+
+          class MainActivity : ComponentActivity() {
+
+              private val vm: GameViewModel by viewModels()
+
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
+                  WindowCompat.setDecorFitsSystemWindows(window, false)
+                  if (Build.VERSION.SDK_INT >= 28) {
+                      val lp = window.attributes
+                      lp.layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= 30) {
+                          WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                      } else {
+                          WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                      }
+                      window.attributes = lp
+                  }
+                  hideSystemUi()
+                  Sfx.enabled = Prefs.sfx(this)
+                  Sfx.init()
+                  AmbientMusic.volume = Prefs.musicVolume(this)
+                  setContent {
+                      AllCoreTheme {
+                          AllCoreApp(vm)
+                      }
+                  }
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  hideSystemUi()
+                  if (Prefs.music(this)) AmbientMusic.start()
+              }
+
+              override fun onPause() {
+                  super.onPause()
+                  AmbientMusic.pause()
+              }
+
+              override fun onWindowFocusChanged(hasFocus: Boolean) {
+                  super.onWindowFocusChanged(hasFocus)
+                  if (hasFocus) hideSystemUi()
+              }
+
+              private fun hideSystemUi() {
+                  val c = WindowInsetsControllerCompat(window, window.decorView)
+                  c.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                  c.hide(WindowInsetsCompat.Type.systemBars())
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/data/Game.kt
+          package com.allcore.emulator.data
+
+          import android.content.Context
+          import androidx.room.Dao
+          import androidx.room.Database
+          import androidx.room.Delete
+          import androidx.room.Entity
+          import androidx.room.Insert
+          import androidx.room.PrimaryKey
+          import androidx.room.Query
+          import androidx.room.Room
+          import androidx.room.RoomDatabase
+          import androidx.room.Update
+
+          @Entity(tableName = "games")
+          data class Game(
+              @PrimaryKey(autoGenerate = true) val id: Long = 0,
+              val name: String,
+              val filePath: String,
+              val platform: String,
+              val coverPath: String? = null,
+              val favorite: Boolean = false,
+              val addedAt: Long = System.currentTimeMillis()
+          )
+
+          @Dao
+          interface GameDao {
+              @Query("SELECT * FROM games ORDER BY addedAt DESC")
+              suspend fun getAll(): List<Game>
+
+              @Query("SELECT * FROM games WHERE id = :id LIMIT 1")
+              suspend fun getById(id: Long): Game?
+
+              @Insert
+              suspend fun insert(game: Game): Long
+
+              @Update
+              suspend fun update(game: Game)
+
+              @Delete
+              suspend fun delete(game: Game)
+          }
+
+          @Database(entities = [Game::class], version = 1, exportSchema = false)
+          abstract class AppDatabase : RoomDatabase() {
+              abstract fun gameDao(): GameDao
+
+              companion object {
+                  @Volatile
+                  private var instance: AppDatabase? = null
+
+                  fun get(context: Context): AppDatabase {
+                      return instance ?: synchronized(this) {
+                          instance ?: Room.databaseBuilder(
+                              context.applicationContext,
+                              AppDatabase::class.java,
+                              "allcore.db"
+                          ).build().also { instance = it }
+                      }
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/data/GameViewModel.kt
+          package com.allcore.emulator.data
+
+          import android.app.Application
+          import androidx.lifecycle.AndroidViewModel
+          import androidx.lifecycle.viewModelScope
+          import com.allcore.emulator.util.FileHelper
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.flow.MutableStateFlow
+          import kotlinx.coroutines.flow.StateFlow
+          import kotlinx.coroutines.flow.asStateFlow
+          import kotlinx.coroutines.launch
+          import kotlinx.coroutines.withContext
+          import java.io.File
+
+          class GameViewModel(app: Application) : AndroidViewModel(app) {
+
+              private val dao = AppDatabase.get(app).gameDao()
+              private val _games = MutableStateFlow<List<Game>>(emptyList())
+              val games: StateFlow<List<Game>> = _games.asStateFlow()
+
+              init {
+                  refresh()
+              }
+
+              fun refresh() {
+                  viewModelScope.launch(Dispatchers.IO) {
+                      _games.value = dao.getAll()
+                  }
+              }
+
+              fun addGame(game: Game, onDone: (Long) -> Unit = {}) {
+                  viewModelScope.launch(Dispatchers.IO) {
+                      val existing = dao.getAll().firstOrNull { it.filePath == game.filePath }
+                      val id = existing?.id ?: dao.insert(game)
+                      _games.value = dao.getAll()
+                      withContext(Dispatchers.Main) { onDone(id) }
+                  }
+              }
+
+              fun updateGame(game: Game) {
+                  viewModelScope.launch(Dispatchers.IO) {
+                      dao.update(game)
+                      _games.value = dao.getAll()
+                  }
+              }
+
+              fun deleteGame(game: Game) {
+                  viewModelScope.launch(Dispatchers.IO) {
+                      dao.delete(game)
+                      try {
+                          val f = File(game.filePath)
+                          if (FileHelper.isInGamesDir(f)) f.delete()
+                      } catch (e: Exception) {
+                      }
+                      _games.value = dao.getAll()
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/util/PlatformDetector.kt
+          package com.allcore.emulator.util
+
+          enum class Platform(
+              val display: String,
+              val title: String,
+              val color: Long,
+              val formats: String
+          ) {
+              PS1("PS1", "PlayStation", 0xFF9FB4D9, "cue, chd, pbp, bin, iso"),
+              PSP("PSP", "PlayStation Portable", 0xFF3B82F6, "iso, cso"),
+              PS2("PS2", "PlayStation 2", 0xFF4F6BFF, "iso, bin"),
+              PS3("PS3", "PlayStation 3", 0xFF8B5CF6, "pkg, iso"),
+              NES("NES", "Nintendo Entertainment System", 0xFFEF4444, "nes"),
+              SNES("SNES", "Super Nintendo", 0xFFA78BFA, "sfc, smc"),
+              GB("GB", "Game Boy", 0xFF84CC16, "gb"),
+              GBC("GBC", "Game Boy Color", 0xFFF59E0B, "gbc"),
+              GBA("GBA", "Game Boy Advance", 0xFF6366F1, "gba"),
+              N64("N64", "Nintendo 64", 0xFF10B981, "n64, z64, v64"),
+              NDS("NDS", "Nintendo DS", 0xFF14B8A6, "nds"),
+              GAMECUBE("GameCube", "Nintendo GameCube", 0xFF9B7CFF, "gcm, gcz, iso"),
+              WII("Wii", "Nintendo Wii", 0xFF38BDF8, "wbfs, rvz, iso"),
+              PC("PC (EXE)", "Windows (Winlator)", 0xFF22D3EE, "exe"),
+              ANDROID("Android", "Android APK", 0xFF4ADE80, "apk"),
+              UNKNOWN("Bilinmiyor", "Bilinmeyen platform", 0xFF64748B, "-");
+
+              companion object {
+                  fun fromDisplay(s: String): Platform =
+                      values().firstOrNull { it.display == s } ?: UNKNOWN
+              }
+          }
+
+          object PlatformDetector {
+              private val gcRegex = Regex("(^|[^a-z])gc([^a-z]|$)")
+
+              fun detect(fileName: String): Platform {
+                  val lower = fileName.lowercase()
+                  val ext = lower.substringAfterLast('.', "")
+                  return when (ext) {
+                      "pbp", "cue", "chd" -> Platform.PS1
+                      "cso" -> Platform.PSP
+                      "nes" -> Platform.NES
+                      "sfc", "smc" -> Platform.SNES
+                      "gb" -> Platform.GB
+                      "gbc" -> Platform.GBC
+                      "gba" -> Platform.GBA
+                      "n64", "z64", "v64" -> Platform.N64
+                      "nds" -> Platform.NDS
+                      "gcm", "gcz" -> Platform.GAMECUBE
+                      "wbfs", "rvz" -> Platform.WII
+                      "apk" -> Platform.ANDROID
+                      "exe" -> Platform.PC
+                      "pkg" -> Platform.PS3
+                      "iso", "bin" -> when {
+                          lower.contains("ps2") -> Platform.PS2
+                          lower.contains("ps3") -> Platform.PS3
+                          lower.contains("gamecube") || gcRegex.containsMatchIn(lower) -> Platform.GAMECUBE
+                          lower.contains("wii") -> Platform.WII
+                          else -> Platform.PS1
+                      }
+                      else -> Platform.UNKNOWN
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/util/FileHelper.kt
+          package com.allcore.emulator.util
+
+          import android.content.Context
+          import android.content.Intent
+          import android.net.Uri
+          import android.os.Build
+          import android.os.Environment
+          import android.provider.OpenableColumns
+          import android.provider.Settings
+          import android.widget.Toast
+          import java.io.File
+          import java.io.FileInputStream
+          import java.io.FileOutputStream
+          import java.io.IOException
+          import java.util.concurrent.ConcurrentHashMap
+          import java.util.zip.ZipInputStream
+
+          fun toast(context: Context, msg: String) {
+              Toast.makeText(context.applicationContext, msg, Toast.LENGTH_LONG).show()
+          }
+
+          object DownloadTracker {
+              val pending = ConcurrentHashMap<Long, File>()
+          }
+
+          object FileHelper {
+
+              fun hasAllFiles(): Boolean =
+                  Build.VERSION.SDK_INT >= 30 && Environment.isExternalStorageManager()
+
+              fun needsAllFiles(): Boolean =
+                  Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager()
+
+              fun gamesDir(context: Context): File {
+                  if (hasAllFiles()) {
+                      val shared = File(Environment.getExternalStorageDirectory(), "AllCore/games")
+                      shared.mkdirs()
+                      if (shared.isDirectory && shared.canWrite()) return shared
+                  }
+                  val d = context.getExternalFilesDir("games") ?: File(context.filesDir, "games")
+                  d.mkdirs()
+                  return d
+              }
+
+              fun requestAllFiles(context: Context) {
+                  if (Build.VERSION.SDK_INT < 30) return
+                  try {
+                      val i = Intent(
+                          Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                          Uri.parse("package:" + context.packageName)
+                      )
+                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                      context.startActivity(i)
+                  } catch (e: Exception) {
+                      try {
+                          val i2 = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                          i2.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                          context.startActivity(i2)
+                      } catch (e2: Exception) {
+                      }
+                  }
+              }
+
+              fun isInGamesDir(f: File): Boolean {
+                  val p = f.absolutePath
+                  return p.contains("/AllCore/games/") || p.contains("/files/games/")
+              }
+
+              fun uniqueFile(dir: File, name: String): File {
+                  dir.mkdirs()
+                  var f = File(dir, name)
+                  if (!f.exists()) return f
+                  val base = name.substringBeforeLast('.', name)
+                  val ext = if (name.contains('.')) "." + name.substringAfterLast('.') else ""
+                  var n = 1
+                  while (f.exists()) {
+                      f = File(dir, "$base ($n)$ext")
+                      n++
+                  }
+                  return f
+              }
+
+              fun displayName(fileName: String): String {
+                  val base = fileName.substringBeforeLast('.', fileName)
+                  return base.replace('_', ' ').trim().ifEmpty { fileName }
+              }
+
+              fun queryName(context: Context, uri: Uri): String {
+                  var name: String? = null
+                  try {
+                      context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                          val i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                          if (i >= 0 && c.moveToFirst()) name = c.getString(i)
+                      }
+                  } catch (e: Exception) {
+                  }
+                  return name ?: uri.lastPathSegment?.substringAfterLast('/') ?: "oyun"
+              }
+
+              private fun querySize(context: Context, uri: Uri): Long {
+                  var size = -1L
+                  try {
+                      context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                          val i = c.getColumnIndex(OpenableColumns.SIZE)
+                          if (i >= 0 && c.moveToFirst()) size = c.getLong(i)
+                      }
+                  } catch (e: Exception) {
+                  }
+                  return size
+              }
+
+              fun copyFromUri(context: Context, uri: Uri, dest: File, onProgress: (Float) -> Unit) {
+                  val total = querySize(context, uri)
+                  val input = context.contentResolver.openInputStream(uri) ?: throw IOException("Dosya acilamadi")
+                  input.use { ins ->
+                      FileOutputStream(dest).use { out ->
+                          val buf = ByteArray(256 * 1024)
+                          var done = 0L
+                          var last = 0L
+                          while (true) {
+                              val n = ins.read(buf)
+                              if (n < 0) break
+                              out.write(buf, 0, n)
+                              done += n
+                              if (total > 0 && done - last > 1_000_000L) {
+                                  last = done
+                                  onProgress((done.toFloat() / total.toFloat()).coerceIn(0f, 1f))
+                              }
+                          }
+                      }
+                  }
+                  onProgress(1f)
+              }
+
+              // ZIP icinden ilk taninan oyun dosyasini cikarir
+              fun resolveGameFile(file: File): File {
+                  if (!file.extension.equals("zip", true)) return file
+                  try {
+                      val parent = file.parentFile ?: return file
+                      ZipInputStream(FileInputStream(file).buffered()).use { zis ->
+                          var entry = zis.nextEntry
+                          while (entry != null) {
+                              val e = entry
+                              if (!e.isDirectory) {
+                                  val n = File(e.name).name
+                                  if (PlatformDetector.detect(n) != Platform.UNKNOWN) {
+                                      val out = uniqueFile(parent, n)
+                                      FileOutputStream(out).use { zis.copyTo(it) }
+                                      file.delete()
+                                      return out
+                                  }
+                              }
+                              entry = zis.nextEntry
+                          }
+                      }
+                  } catch (e: Exception) {
+                  }
+                  return file
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/util/Prefs.kt
+          package com.allcore.emulator.util
+
+          import android.content.Context
+
+          object Prefs {
+              private fun sp(c: Context) =
+                  c.applicationContext.getSharedPreferences("allcore_prefs", Context.MODE_PRIVATE)
+
+              fun music(c: Context): Boolean = sp(c).getBoolean("music", true)
+              fun setMusic(c: Context, v: Boolean) = sp(c).edit().putBoolean("music", v).apply()
+
+              fun sfx(c: Context): Boolean = sp(c).getBoolean("sfx", true)
+              fun setSfx(c: Context, v: Boolean) = sp(c).edit().putBoolean("sfx", v).apply()
+
+              fun musicVolume(c: Context): Float = sp(c).getFloat("music_volume", 0.5f)
+              fun setMusicVolume(c: Context, v: Float) = sp(c).edit().putFloat("music_volume", v).apply()
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/util/Sound.kt
+          package com.allcore.emulator.util
+
+          import android.media.AudioAttributes
+          import android.media.AudioFormat
+          import android.media.AudioTrack
+          import java.util.concurrent.ConcurrentHashMap
+          import kotlin.concurrent.thread
+          import kotlin.math.PI
+          import kotlin.math.abs
+          import kotlin.math.exp
+          import kotlin.math.max
+          import kotlin.math.pow
+          import kotlin.math.sin
+
+          private const val RATE = 22050
+
+          private fun staticTrack(data: ShortArray, content: Int): AudioTrack? {
+              return try {
+                  val t = AudioTrack.Builder()
+                      .setAudioAttributes(
+                          AudioAttributes.Builder()
+                              .setUsage(AudioAttributes.USAGE_GAME)
+                              .setContentType(content)
+                              .build()
+                      )
+                      .setAudioFormat(
+                          AudioFormat.Builder()
+                              .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                              .setSampleRate(RATE)
+                              .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                              .build()
+                      )
+                      .setBufferSizeInBytes(data.size * 2)
+                      .setTransferMode(AudioTrack.MODE_STATIC)
+                      .build()
+                  t.write(data, 0, data.size)
+                  t
+              } catch (e: Throwable) {
+                  null
+              }
+          }
+
+          private fun toPcm(buf: FloatArray, peak: Float): ShortArray {
+              var m = 0.0001f
+              for (v in buf) m = max(m, abs(v))
+              val k = peak * 32767f / m
+              return ShortArray(buf.size) { (buf[it] * k).toInt().coerceIn(-32767, 32767).toShort() }
+          }
+
+          // Arka plan muzigi: kodla uretilen yumusak ambient pad dongusu
+          object AmbientMusic {
+              @Volatile private var track: AudioTrack? = null
+              @Volatile private var building = false
+              @Volatile private var want = false
+              @Volatile var volume = 0.5f
+
+              fun start() {
+                  want = true
+                  val t = track
+                  if (t != null) {
+                      try {
+                          t.setVolume(volume)
+                          t.play()
+                      } catch (e: Throwable) {
+                      }
+                      return
+                  }
+                  if (building) return
+                  building = true
+                  thread(name = "allcore-music") {
+                      try {
+                          val data = compose()
+                          val nt = staticTrack(data, AudioAttributes.CONTENT_TYPE_MUSIC)
+                          if (nt != null) {
+                              nt.setLoopPoints(0, data.size, -1)
+                              nt.setVolume(volume)
+                              track = nt
+                              if (want) nt.play()
+                          }
+                      } catch (e: Throwable) {
+                      } finally {
+                          building = false
+                      }
+                  }
+              }
+
+              fun pause() {
+                  want = false
+                  try {
+                      track?.pause()
+                  } catch (e: Throwable) {
+                  }
+              }
+
+              fun applyVolume(v: Float) {
+                  volume = v
+                  try {
+                      track?.setVolume(v)
+                  } catch (e: Throwable) {
+                  }
+              }
+
+              private fun compose(): ShortArray {
+                  val chordLen = 4 * RATE
+                  val total = chordLen * 4
+                  val buf = FloatArray(total)
+                  val chords = arrayOf(
+                      floatArrayOf(110.00f, 164.81f, 220.00f, 261.63f, 329.63f),
+                      floatArrayOf(87.31f, 130.81f, 174.61f, 220.00f, 261.63f),
+                      floatArrayOf(130.81f, 196.00f, 261.63f, 329.63f, 392.00f),
+                      floatArrayOf(98.00f, 146.83f, 196.00f, 246.94f, 293.66f)
+                  )
+                  val win = chordLen + chordLen / 2
+                  for (c in 0 until 4) {
+                      val start = c * chordLen
+                      for ((ni, f) in chords[c].withIndex()) {
+                          val amp = if (ni == 0) 0.9 else 0.55
+                          val w = 2.0 * PI * f / RATE
+                          val w2 = w * 1.004
+                          val lfo = 2.0 * PI * (0.18 + 0.05 * ni) / RATE
+                          for (j in 0 until win) {
+                              val u = j.toDouble() / win
+                              val env = sin(PI * u).pow(2.0)
+                              val trem = 1.0 + 0.18 * sin(lfo * j + ni)
+                              val s = (sin(w * j) + 0.6 * sin(w2 * j)) * env * trem * amp
+                              buf[(start + j) % total] += s.toFloat()
+                          }
+                      }
+                  }
+                  val bells = floatArrayOf(659.25f, 783.99f, 880.00f, 987.77f, 1174.66f)
+                  val seq = intArrayOf(0, 2, 4, 3, 1, 2, 4, 0)
+                  for (b in 0 until 8) {
+                      val start = b * (total / 8)
+                      val w = 2.0 * PI * bells[seq[b]] / RATE
+                      val len = (2.6 * RATE).toInt()
+                      for (j in 0 until len) {
+                          val t = j.toDouble() / RATE
+                          val env = exp(-2.2 * t) * minOf(1.0, j / (RATE * 0.01))
+                          buf[(start + j) % total] += (0.16 * sin(w * j) * env).toFloat()
+                      }
+                  }
+                  return toPcm(buf, 0.55f)
+              }
+          }
+
+          // Arayuz ses efektleri
+          object Sfx {
+              @Volatile var enabled = true
+              @Volatile var volume = 0.6f
+              private val tracks = ConcurrentHashMap<String, AudioTrack>()
+
+              private class N(val f: Float, val at: Int, val len: Int, val amp: Float)
+
+              private fun build(name: String, totalMs: Int, notes: List<N>) {
+                  val n = RATE * totalMs / 1000
+                  val buf = FloatArray(n)
+                  for (nt in notes) {
+                      val s0 = RATE * nt.at / 1000
+                      val l = RATE * nt.len / 1000
+                      val w = 2.0 * PI * nt.f / RATE
+                      for (j in 0 until l) {
+                          val i = s0 + j
+                          if (i >= n) break
+                          val att = minOf(1.0, j / (RATE * 0.004))
+                          val env = att * (1.0 - j.toDouble() / l).pow(2.0)
+                          buf[i] += ((sin(w * j) + 0.35 * sin(2 * w * j)) * env * nt.amp).toFloat()
+                      }
+                  }
+                  val t = staticTrack(toPcm(buf, 0.8f), AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                  if (t != null) tracks[name] = t
+              }
+
+              fun init() {
+                  if (tracks.isNotEmpty()) return
+                  build("move", 70, listOf(N(1400f, 0, 60, 0.7f)))
+                  build("select", 220, listOf(N(660f, 0, 120, 0.7f), N(990f, 60, 160, 0.7f)))
+                  build("back", 200, listOf(N(620f, 0, 100, 0.7f), N(420f, 70, 130, 0.7f)))
+                  build(
+                      "boot", 1900,
+                      listOf(
+                          N(261.63f, 0, 1200, 0.5f),
+                          N(329.63f, 180, 1200, 0.5f),
+                          N(392f, 360, 1300, 0.5f),
+                          N(523.25f, 540, 1360, 0.6f),
+                          N(1046.5f, 900, 900, 0.25f)
+                      )
+                  )
+              }
+
+              private fun play(name: String) {
+                  if (!enabled) return
+                  val t = tracks[name] ?: return
+                  try {
+                      t.setVolume(volume)
+                      t.stop()
+                      t.reloadStaticData()
+                      t.play()
+                  } catch (e: Throwable) {
+                  }
+              }
+
+              fun move() = play("move")
+              fun select() = play("select")
+              fun back() = play("back")
+              fun boot() = play("boot")
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/emulator/EmulatorBridge.kt
+          package com.allcore.emulator.emulator
+
+          import android.content.Context
+          import android.content.Intent
+          import android.net.Uri
+          import androidx.core.content.FileProvider
+          import com.allcore.emulator.util.toast
+          import java.io.File
+
+          interface EmulatorBridge {
+              val packageName: String
+              val displayName: String
+              val manualSelect: Boolean get() = false
+              fun isInstalled(context: Context): Boolean
+              fun openStore(context: Context)
+              fun launch(context: Context, gamePath: String): Boolean
+              fun openEmulator(context: Context): Boolean
+          }
+
+          fun EmulatorBridge.checkInstalled(context: Context): Boolean {
+              return try {
+                  context.packageManager.getPackageInfo(packageName, 0)
+                  true
+              } catch (e: Exception) {
+                  false
+              }
+          }
+
+          fun EmulatorBridge.launchStore(context: Context) {
+              try {
+                  val i = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
+                  i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                  context.startActivity(i)
+              } catch (e: Exception) {
+                  try {
+                      val i2 = Intent(
+                          Intent.ACTION_VIEW,
+                          Uri.parse("https://play.google.com/store/apps/details?id=$packageName")
+                      )
+                      i2.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                      context.startActivity(i2)
+                  } catch (e2: Exception) {
+                      toast(context, "Play Store acilamadi")
+                  }
+              }
+          }
+
+          fun EmulatorBridge.launchEmulator(context: Context): Boolean {
+              val i = context.packageManager.getLaunchIntentForPackage(packageName) ?: return false
+              i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+              return context.startSafe(i)
+          }
+
+          internal fun Context.startSafe(intent: Intent): Boolean {
+              return try {
+                  intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                  startActivity(intent)
+                  true
+              } catch (e: Exception) {
+                  false
+              }
+          }
+
+          internal fun contentUriFor(context: Context, path: String): Uri? {
+              return try {
+                  FileProvider.getUriForFile(context, context.packageName + ".fileprovider", File(path))
+              } catch (e: Exception) {
+                  null
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/emulator/Bridges.kt
+          package com.allcore.emulator.emulator
+
+          import android.content.Context
+          import android.content.Intent
+          import android.net.Uri
+          import android.os.Build
+          import android.os.Environment
+          import android.provider.Settings
+          import java.io.File
+
+          abstract class BaseBridge(
+              override val packageName: String,
+              override val displayName: String,
+              override val manualSelect: Boolean = false
+          ) : EmulatorBridge {
+              override fun isInstalled(context: Context): Boolean = checkInstalled(context)
+              override fun openStore(context: Context) = launchStore(context)
+              override fun openEmulator(context: Context): Boolean = launchEmulator(context)
+          }
+
+          class PPSSPPBridge : BaseBridge("org.ppsspp.ppsspp", "PPSSPP") {
+              override fun launch(context: Context, gamePath: String): Boolean {
+                  val i = Intent(Intent.ACTION_VIEW)
+                  i.setClassName(packageName, "org.ppsspp.ppsspp.PpssppActivity")
+                  i.putExtra("p", gamePath)
+                  val uri = contentUriFor(context, gamePath)
+                  if (uri != null) {
+                      i.data = uri
+                      i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                  }
+                  return context.startSafe(i)
+              }
+          }
+
+          class RetroArchBridge : BaseBridge("com.retroarch", "RetroArch") {
+              private val cores = mapOf(
+                  "nes" to "fceumm_libretro_android.so",
+                  "sfc" to "snes9x_libretro_android.so",
+                  "smc" to "snes9x_libretro_android.so",
+                  "gb" to "gambatte_libretro_android.so",
+                  "gbc" to "gambatte_libretro_android.so",
+                  "gba" to "mgba_libretro_android.so",
+                  "n64" to "mupen64plus_next_libretro_android.so",
+                  "z64" to "mupen64plus_next_libretro_android.so",
+                  "v64" to "mupen64plus_next_libretro_android.so",
+                  "nds" to "melonds_libretro_android.so"
+              )
+
+              override fun launch(context: Context, gamePath: String): Boolean {
+                  val core = cores[File(gamePath).extension.lowercase()] ?: return false
+                  val cfg = Environment.getExternalStorageDirectory().absolutePath +
+                      "/Android/data/com.retroarch/files/retroarch.cfg"
+                  val i = Intent(Intent.ACTION_MAIN)
+                  i.setClassName(packageName, "com.retroarch.browser.retroactivity.RetroActivityFuture")
+                  i.putExtra("ROM", gamePath)
+                  i.putExtra("LIBRETRO", "/data/data/com.retroarch/cores/$core")
+                  i.putExtra("CONFIGFILE", cfg)
+                  i.putExtra("QUITFOCUS", "")
+                  return context.startSafe(i)
+              }
+          }
+
+          class DuckStationBridge : BaseBridge("com.github.stenzek.duckstation", "DuckStation") {
+              override fun launch(context: Context, gamePath: String): Boolean {
+                  val i = Intent(Intent.ACTION_MAIN)
+                  i.setClassName(packageName, "com.github.stenzek.duckstation.EmulationActivity")
+                  i.putExtra("bootPath", gamePath)
+                  return context.startSafe(i)
+              }
+          }
+
+          class AetherSX2Bridge : BaseBridge("xyz.aethersx2.android", "AetherSX2", manualSelect = true) {
+              override fun launch(context: Context, gamePath: String): Boolean = openEmulator(context)
+          }
+
+          class WinlatorBridge : BaseBridge("com.winlator", "Winlator", manualSelect = true) {
+              override fun launch(context: Context, gamePath: String): Boolean = openEmulator(context)
+          }
+
+          class Armsx3Bridge : BaseBridge("com.armsx3.play", "ARMSX3 (Deneysel)", manualSelect = true) {
+              override fun launch(context: Context, gamePath: String): Boolean = openEmulator(context)
+          }
+
+          class DolphinBridge : BaseBridge("org.dolphinemu.dolphinemu", "Dolphin") {
+              override fun launch(context: Context, gamePath: String): Boolean {
+                  val i = Intent(Intent.ACTION_VIEW)
+                  i.setClassName(packageName, "org.dolphinemu.dolphinemu.ui.main.MainActivity")
+                  i.putExtra("AutoStartFile", gamePath)
+                  return context.startSafe(i)
+              }
+          }
+
+          class ApkBridge : BaseBridge("", "Android (APK)") {
+              override fun isInstalled(context: Context): Boolean = true
+
+              override fun openStore(context: Context) {}
+
+              override fun launch(context: Context, gamePath: String): Boolean {
+                  if (Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
+                      return openEmulator(context)
+                  }
+                  val uri = contentUriFor(context, gamePath) ?: return false
+                  val i = Intent(Intent.ACTION_VIEW)
+                  i.setDataAndType(uri, "application/vnd.android.package-archive")
+                  i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                  return context.startSafe(i)
+              }
+
+              override fun openEmulator(context: Context): Boolean {
+                  val i = Intent(
+                      Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                      Uri.parse("package:" + context.packageName)
+                  )
+                  return context.startSafe(i)
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/emulator/EmulatorRegistry.kt
+          package com.allcore.emulator.emulator
+
+          import android.content.ClipData
+          import android.content.ClipboardManager
+          import android.content.Context
+          import com.allcore.emulator.data.Game
+          import com.allcore.emulator.util.Platform
+          import com.allcore.emulator.util.toast
+          import java.io.File
+
+          object EmulatorRegistry {
+              private val duck = DuckStationBridge()
+              private val ppsspp = PPSSPPBridge()
+              private val aether = AetherSX2Bridge()
+              private val armsx3 = Armsx3Bridge()
+              private val retro = RetroArchBridge()
+              private val dolphin = DolphinBridge()
+              private val winlator = WinlatorBridge()
+              private val apk = ApkBridge()
+
+              private val map: Map<Platform, EmulatorBridge> = linkedMapOf<Platform, EmulatorBridge>(
+                  Platform.PS1 to duck,
+                  Platform.PSP to ppsspp,
+                  Platform.PS2 to aether,
+                  Platform.PS3 to armsx3,
+                  Platform.NES to retro,
+                  Platform.SNES to retro,
+                  Platform.GB to retro,
+                  Platform.GBC to retro,
+                  Platform.GBA to retro,
+                  Platform.N64 to retro,
+                  Platform.NDS to retro,
+                  Platform.GAMECUBE to dolphin,
+                  Platform.WII to dolphin,
+                  Platform.PC to winlator,
+                  Platform.ANDROID to apk
+              )
+
+              fun bridgeFor(platform: Platform): EmulatorBridge? = map[platform]
+
+              fun all(): Collection<EmulatorBridge> = map.values.distinct()
+
+              fun platformsOf(bridge: EmulatorBridge): List<Platform> =
+                  map.filterValues { it === bridge }.keys.toList()
+          }
+
+          object GameLauncher {
+
+              fun play(context: Context, game: Game) {
+                  val platform = Platform.fromDisplay(game.platform)
+                  val bridge = EmulatorRegistry.bridgeFor(platform)
+                  if (bridge == null) {
+                      toast(context, "Bu platform icin emulator bulunamadi")
+                      return
+                  }
+                  if (!File(game.filePath).exists()) {
+                      toast(context, "Oyun dosyasi bulunamadi. Kutuphaneden silip yeniden ekle.")
+                      return
+                  }
+                  if (!bridge.isInstalled(context)) {
+                      toast(context, "${bridge.displayName} kurulu degil. Play Store aciliyor...")
+                      bridge.openStore(context)
+                      return
+                  }
+                  val ok = try {
+                      bridge.launch(context, game.filePath)
+                  } catch (e: Exception) {
+                      false
+                  }
+                  if (!ok) {
+                      toast(context, "${bridge.displayName} dogrudan baslatilamadi, emulator aciliyor")
+                      if (!bridge.openEmulator(context)) bridge.openStore(context)
+                  } else if (bridge.manualSelect) {
+                      try {
+                          val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                          cm.setPrimaryClip(ClipData.newPlainText("AllCore", game.filePath))
+                      } catch (e: Exception) {
+                      }
+                      toast(context, "${bridge.displayName} acildi. Oyun yolu panoya kopyalandi, emulatorden oyunu sec.")
+                  }
+              }
+
+              fun openSettings(context: Context, game: Game) {
+                  val platform = Platform.fromDisplay(game.platform)
+                  val bridge = EmulatorRegistry.bridgeFor(platform)
+                  if (bridge == null) {
+                      toast(context, "Bu platform icin emulator bulunamadi")
+                      return
+                  }
+                  if (!bridge.isInstalled(context)) {
+                      toast(context, "${bridge.displayName} kurulu degil. Play Store aciliyor...")
+                      bridge.openStore(context)
+                      return
+                  }
+                  if (!bridge.openEmulator(context)) {
+                      toast(context, "${bridge.displayName} acilamadi")
+                      bridge.openStore(context)
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/ui/Theme.kt
+          package com.allcore.emulator.ui
+
+          import androidx.compose.animation.AnimatedVisibility
+          import androidx.compose.animation.animateColorAsState
+          import androidx.compose.animation.core.FastOutSlowInEasing
+          import androidx.compose.animation.core.LinearEasing
+          import androidx.compose.animation.core.RepeatMode
+          import androidx.compose.animation.core.Spring
+          import androidx.compose.animation.core.animateFloat
+          import androidx.compose.animation.core.animateFloatAsState
+          import androidx.compose.animation.core.infiniteRepeatable
+          import androidx.compose.animation.core.rememberInfiniteTransition
+          import androidx.compose.animation.core.spring
+          import androidx.compose.animation.core.tween
+          import androidx.compose.animation.fadeIn
+          import androidx.compose.animation.scaleIn
+          import androidx.compose.animation.slideInVertically
+          import androidx.compose.foundation.Canvas
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.border
+          import androidx.compose.foundation.clickable
+          import androidx.compose.foundation.interaction.MutableInteractionSource
+          import androidx.compose.foundation.interaction.collectIsPressedAsState
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.material3.MaterialTheme
+          import androidx.compose.material3.darkColorScheme
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.DisposableEffect
+          import androidx.compose.runtime.LaunchedEffect
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableIntStateOf
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.geometry.Offset
+          import androidx.compose.ui.graphics.Brush
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.graphics.Shape
+          import androidx.compose.ui.graphics.graphicsLayer
+          import androidx.compose.ui.platform.LocalLifecycleOwner
+          import androidx.compose.ui.unit.dp
+          import androidx.lifecycle.Lifecycle
+          import androidx.lifecycle.LifecycleEventObserver
+          import com.allcore.emulator.util.Sfx
+          import kotlinx.coroutines.delay
+          import kotlin.math.PI
+          import kotlin.math.sin
+
+          object AC {
+              val Bg0 = Color(0xFF05070D)
+              val Bg1 = Color(0xFF0A1226)
+              val Blue = Color(0xFF2F7BFF)
+              val Cyan = Color(0xFF3DE0FF)
+              val Violet = Color(0xFF7A5CFF)
+              val Gold = Color(0xFFFFC94D)
+              val Green = Color(0xFF4ADE80)
+              val Orange = Color(0xFFFFA24D)
+              val Text = Color(0xFFF2F5FB)
+              val Muted = Color(0xFF8C97B2)
+              val Glass = Color(0x1AFFFFFF)
+              val GlassStroke = Color(0x33FFFFFF)
+              val Danger = Color(0xFFFF5C6C)
+          }
+
+          @Composable
+          fun AllCoreTheme(content: @Composable () -> Unit) {
+              MaterialTheme(
+                  colorScheme = darkColorScheme(
+                      primary = AC.Blue,
+                      secondary = AC.Cyan,
+                      background = AC.Bg0,
+                      surface = AC.Bg1,
+                      onPrimary = Color.White,
+                      onBackground = AC.Text,
+                      onSurface = AC.Text,
+                      error = AC.Danger
+                  ),
+                  content = content
+              )
+          }
+
+          @Composable
+          fun AnimatedBackground(accent: Color, modifier: Modifier = Modifier) {
+              val tint by animateColorAsState(accent, tween(900), label = "bgAccent")
+              val inf = rememberInfiniteTransition(label = "bg")
+              val a by inf.animateFloat(
+                  0f, 1f,
+                  infiniteRepeatable(tween(16000, easing = LinearEasing), RepeatMode.Reverse),
+                  label = "a"
+              )
+              val b by inf.animateFloat(
+                  0f, 1f,
+                  infiniteRepeatable(tween(23000, easing = LinearEasing), RepeatMode.Reverse),
+                  label = "b"
+              )
+              val p by inf.animateFloat(
+                  0f, 1f,
+                  infiniteRepeatable(tween(26000, easing = LinearEasing), RepeatMode.Restart),
+                  label = "p"
+              )
+              Canvas(modifier.fillMaxSize()) {
+                  val w = size.width
+                  val h = size.height
+                  drawRect(Brush.verticalGradient(listOf(AC.Bg1, AC.Bg0)))
+                  val c1 = Offset(w * (0.15f + 0.55f * a), h * (0.25f + 0.25f * b))
+                  drawCircle(
+                      Brush.radialGradient(
+                          listOf(tint.copy(alpha = 0.34f), Color.Transparent),
+                          center = c1, radius = h * 0.95f
+                      ),
+                      radius = h * 0.95f, center = c1
+                  )
+                  val c2 = Offset(w * (0.85f - 0.5f * b), h * (0.85f - 0.3f * a))
+                  drawCircle(
+                      Brush.radialGradient(
+                          listOf(AC.Violet.copy(alpha = 0.22f), Color.Transparent),
+                          center = c2, radius = h * 0.8f
+                      ),
+                      radius = h * 0.8f, center = c2
+                  )
+                  val c3 = Offset(w * (0.5f + 0.3f * (1f - a)), h * (0.1f + 0.1f * b))
+                  drawCircle(
+                      Brush.radialGradient(
+                          listOf(AC.Cyan.copy(alpha = 0.10f), Color.Transparent),
+                          center = c3, radius = h * 0.6f
+                      ),
+                      radius = h * 0.6f, center = c3
+                  )
+                  for (i in 0 until 34) {
+                      val seedX = ((i * 53) % 97) / 97f
+                      val speed = 0.6f + ((i * 31) % 7) / 10f
+                      val ph = (p * speed + i * 0.113f) % 1f
+                      val x = w * seedX + sin((ph * 2f * PI + i).toFloat()) * 18f
+                      val y = h * (1f - ph)
+                      val al = (sin(ph * PI).toFloat() * 0.55f).coerceIn(0f, 1f)
+                      val r = 1.5f + (i % 4) * 1.3f
+                      drawCircle(Color.White.copy(alpha = al), r, Offset(x, y))
+                  }
+              }
+          }
+
+          @Composable
+          fun Modifier.bounceClick(
+              sound: Boolean = true,
+              enabled: Boolean = true,
+              onClick: () -> Unit
+          ): Modifier {
+              val src = remember { MutableInteractionSource() }
+              val pressed by src.collectIsPressedAsState()
+              val s by animateFloatAsState(
+                  if (pressed) 0.93f else 1f,
+                  spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                  label = "press"
+              )
+              return this
+                  .graphicsLayer {
+                      scaleX = s
+                      scaleY = s
+                  }
+                  .clickable(interactionSource = src, indication = null, enabled = enabled) {
+                      if (sound) Sfx.select()
+                      onClick()
+                  }
+          }
+
+          fun Modifier.glass(
+              shape: Shape = RoundedCornerShape(20.dp),
+              fill: Color = AC.Glass
+          ): Modifier = this
+              .clip(shape)
+              .background(fill)
+              .border(1.dp, AC.GlassStroke, shape)
+
+          @Composable
+          fun Reveal(
+              delayMs: Int = 0,
+              modifier: Modifier = Modifier,
+              content: @Composable () -> Unit
+          ) {
+              var shown by remember { mutableStateOf(false) }
+              LaunchedEffect(Unit) {
+                  delay(delayMs.toLong())
+                  shown = true
+              }
+              AnimatedVisibility(
+                  visible = shown,
+                  modifier = modifier,
+                  enter = fadeIn(animationSpec = tween(500)) +
+                      slideInVertically(tween(600, easing = FastOutSlowInEasing)) { it / 4 } +
+                      scaleIn(animationSpec = tween(500), initialScale = 0.92f)
+              ) {
+                  content()
+              }
+          }
+
+          @Composable
+          fun rememberResumeTick(): Int {
+              var tick by remember { mutableIntStateOf(0) }
+              val owner = LocalLifecycleOwner.current
+              DisposableEffect(owner) {
+                  val obs = LifecycleEventObserver { _, e ->
+                      if (e == Lifecycle.Event.ON_RESUME) tick++
+                  }
+                  owner.lifecycle.addObserver(obs)
+                  onDispose { owner.lifecycle.removeObserver(obs) }
+              }
+              return tick
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/ui/Components.kt
+          package com.allcore.emulator.ui
+
+          import androidx.compose.animation.AnimatedVisibility
+          import androidx.compose.animation.animateColorAsState
+          import androidx.compose.animation.core.FastOutSlowInEasing
+          import androidx.compose.animation.core.LinearEasing
+          import androidx.compose.animation.core.RepeatMode
+          import androidx.compose.animation.core.animateFloat
+          import androidx.compose.animation.core.infiniteRepeatable
+          import androidx.compose.animation.core.rememberInfiniteTransition
+          import androidx.compose.animation.core.tween
+          import androidx.compose.foundation.Canvas
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.border
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.RowScope
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxHeight
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.layout.size
+          import androidx.compose.foundation.layout.width
+          import androidx.compose.foundation.shape.CircleShape
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.rounded.ArrowBackIosNew
+          import androidx.compose.material.icons.rounded.Language
+          import androidx.compose.material.icons.rounded.Memory
+          import androidx.compose.material.icons.rounded.Settings
+          import androidx.compose.material.icons.rounded.SportsEsports
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.LaunchedEffect
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.draw.drawBehind
+          import androidx.compose.ui.geometry.Offset
+          import androidx.compose.ui.graphics.Brush
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.graphics.Path
+          import androidx.compose.ui.graphics.TileMode
+          import androidx.compose.ui.graphics.drawscope.Stroke
+          import androidx.compose.ui.graphics.drawscope.rotate
+          import androidx.compose.ui.graphics.graphicsLayer
+          import androidx.compose.ui.graphics.vector.ImageVector
+          import androidx.compose.ui.layout.ContentScale
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.text.style.TextOverflow
+          import androidx.compose.ui.unit.Dp
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import coil.compose.AsyncImage
+          import com.allcore.emulator.data.Game
+          import com.allcore.emulator.util.Platform
+          import kotlinx.coroutines.delay
+          import java.io.File
+          import java.text.SimpleDateFormat
+          import java.util.Date
+          import java.util.Locale
+          import kotlin.math.cos
+          import kotlin.math.sin
+
+          enum class BtnKind { Primary, Glass, Danger }
+
+          @Composable
+          fun AcButton(
+              text: String,
+              icon: ImageVector? = null,
+              kind: BtnKind = BtnKind.Glass,
+              enabled: Boolean = true,
+              compact: Boolean = false,
+              modifier: Modifier = Modifier,
+              onClick: () -> Unit
+          ) {
+              val inf = rememberInfiniteTransition(label = "btn")
+              val shift by inf.animateFloat(
+                  0f, 700f,
+                  infiniteRepeatable(tween(2800, easing = LinearEasing), RepeatMode.Restart),
+                  label = "shift"
+              )
+              val shape = RoundedCornerShape(50)
+              val fg = when (kind) {
+                  BtnKind.Primary -> Color.White
+                  BtnKind.Glass -> AC.Text
+                  BtnKind.Danger -> AC.Danger
+              }
+              val stroke = when (kind) {
+                  BtnKind.Primary -> Color(0x55FFFFFF)
+                  BtnKind.Glass -> AC.GlassStroke
+                  BtnKind.Danger -> AC.Danger.copy(alpha = 0.6f)
+              }
+              Box(
+                  modifier
+                      .bounceClick(enabled = enabled, onClick = onClick)
+                      .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
+                      .clip(shape)
+                      .drawBehind {
+                          when (kind) {
+                              BtnKind.Primary -> drawRect(
+                                  Brush.linearGradient(
+                                      listOf(AC.Blue, AC.Cyan, AC.Violet, AC.Blue),
+                                      start = Offset(shift, 0f),
+                                      end = Offset(shift + 600f, 160f),
+                                      tileMode = TileMode.Mirror
+                                  )
+                              )
+                              BtnKind.Glass -> drawRect(Color(0x22FFFFFF))
+                              BtnKind.Danger -> drawRect(Color(0x22FF5C6C))
+                          }
+                      }
+                      .border(1.dp, stroke, shape),
+                  contentAlignment = Alignment.Center
+              ) {
+                  Row(
+                      Modifier.padding(
+                          horizontal = if (compact) 14.dp else 26.dp,
+                          vertical = if (compact) 10.dp else 13.dp
+                      ),
+                      horizontalArrangement = Arrangement.Center,
+                      verticalAlignment = Alignment.CenterVertically
+                  ) {
+                      if (icon != null) {
+                          Icon(icon, null, tint = fg, modifier = Modifier.size(if (compact) 18.dp else 22.dp))
+                          Spacer(Modifier.width(if (compact) 6.dp else 10.dp))
+                      }
+                      Text(
+                          text,
+                          color = fg,
+                          fontWeight = FontWeight.SemiBold,
+                          fontSize = if (compact) 12.sp else 15.sp,
+                          letterSpacing = 0.4.sp,
+                          maxLines = 1,
+                          softWrap = false,
+                          overflow = TextOverflow.Ellipsis
+                      )
+                  }
+              }
+          }
+
+          @Composable
+          fun IconPill(
+              icon: ImageVector,
+              onClick: () -> Unit,
+              modifier: Modifier = Modifier,
+              tint: Color = AC.Text,
+              size: Dp = 44.dp,
+              sound: Boolean = true
+          ) {
+              Box(
+                  modifier
+                      .size(size)
+                      .bounceClick(sound = sound, onClick = onClick)
+                      .clip(CircleShape)
+                      .background(AC.Glass)
+                      .border(1.dp, AC.GlassStroke, CircleShape),
+                  contentAlignment = Alignment.Center
+              ) {
+                  Icon(icon, null, tint = tint, modifier = Modifier.size(size * 0.5f))
+              }
+          }
+
+          @Composable
+          fun ScreenHeader(
+              title: String,
+              onBack: () -> Unit,
+              actions: @Composable RowScope.() -> Unit = {}
+          ) {
+              Row(
+                  Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 10.dp),
+                  verticalAlignment = Alignment.CenterVertically
+              ) {
+                  IconPill(Icons.Rounded.ArrowBackIosNew, onBack, sound = false)
+                  Spacer(Modifier.width(16.dp))
+                  Text(
+                      title,
+                      modifier = Modifier.weight(1f),
+                      color = AC.Text,
+                      fontSize = 22.sp,
+                      fontWeight = FontWeight.Black,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis
+                  )
+                  actions()
+              }
+          }
+
+          @Composable
+          fun Chip(text: String, color: Color, modifier: Modifier = Modifier) {
+              val shape = RoundedCornerShape(50)
+              Text(
+                  text,
+                  modifier
+                      .clip(shape)
+                      .background(color.copy(alpha = 0.22f))
+                      .border(1.dp, color.copy(alpha = 0.6f), shape)
+                      .padding(horizontal = 12.dp, vertical = 4.dp),
+                  color = Color.White,
+                  fontSize = 11.sp,
+                  fontWeight = FontWeight.Bold,
+                  letterSpacing = 1.sp,
+                  maxLines = 1
+              )
+          }
+
+          @Composable
+          fun ProgressBar(fraction: Float, modifier: Modifier = Modifier) {
+              Box(modifier.height(6.dp).clip(RoundedCornerShape(50)).background(AC.Glass)) {
+                  Box(
+                      Modifier
+                          .fillMaxHeight()
+                          .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                          .clip(RoundedCornerShape(50))
+                          .background(Brush.horizontalGradient(listOf(AC.Blue, AC.Cyan)))
+                  )
+              }
+          }
+
+          @Composable
+          fun StatusDot(ok: Boolean) {
+              val inf = rememberInfiniteTransition(label = "dot")
+              val pulse by inf.animateFloat(
+                  0.5f, 1f,
+                  infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                  label = "pulse"
+              )
+              val c by animateColorAsState(if (ok) AC.Green else AC.Orange, tween(400), label = "dotColor")
+              Box(
+                  Modifier
+                      .size(10.dp)
+                      .graphicsLayer { alpha = pulse }
+                      .clip(CircleShape)
+                      .background(c)
+              )
+          }
+
+          @Composable
+          fun InfoRow(label: String, value: String, valueColor: Color = AC.Text) {
+              Column(Modifier.fillMaxWidth()) {
+                  Row(
+                      Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                      verticalAlignment = Alignment.CenterVertically
+                  ) {
+                      Text(label, Modifier.width(110.dp), color = AC.Muted, fontSize = 13.sp)
+                      Text(
+                          value,
+                          Modifier.weight(1f),
+                          color = valueColor,
+                          fontSize = 14.sp,
+                          fontWeight = FontWeight.SemiBold,
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis
+                      )
+                  }
+                  Box(Modifier.fillMaxWidth().height(1.dp).background(AC.GlassStroke.copy(alpha = 0.15f)))
+              }
+          }
+
+          fun hexPath(cx: Float, cy: Float, r: Float): Path {
+              val path = Path()
+              for (i in 0 until 6) {
+                  val a = Math.toRadians((60 * i - 90).toDouble())
+                  val x = cx + r * cos(a).toFloat()
+                  val y = cy + r * sin(a).toFloat()
+                  if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+              }
+              path.close()
+              return path
+          }
+
+          @Composable
+          fun GameCover(
+              game: Game,
+              modifier: Modifier = Modifier,
+              showLabel: Boolean = true,
+              big: Boolean = false
+          ) {
+              val p = Platform.fromDisplay(game.platform)
+              val c = Color(p.color)
+              val coverFile = remember(game.coverPath) {
+                  val cp = game.coverPath
+                  if (cp != null && File(cp).exists()) File(cp) else null
+              }
+              val initials = remember(game.name) {
+                  game.name.split(' ').filter { it.isNotBlank() }.take(2)
+                      .joinToString("") { it.first().uppercase() }
+              }
+              Box(
+                  modifier
+                      .background(
+                          Brush.linearGradient(
+                              listOf(c.copy(alpha = 0.95f), Color(0xFF0B1226)),
+                              start = Offset.Zero,
+                              end = Offset(700f, 1000f)
+                          )
+                      )
+                      .drawBehind {
+                          drawCircle(
+                              Color.White.copy(alpha = 0.07f),
+                              size.width * 0.7f,
+                              Offset(size.width * 0.9f, size.height * 0.1f)
+                          )
+                          drawCircle(
+                              Color.White.copy(alpha = 0.05f),
+                              size.width * 0.5f,
+                              Offset(size.width * 0.1f, size.height * 0.95f)
+                          )
+                      }
+              ) {
+                  if (coverFile != null) {
+                      AsyncImage(
+                          model = coverFile,
+                          contentDescription = null,
+                          contentScale = ContentScale.Crop,
+                          modifier = Modifier.fillMaxSize()
+                      )
+                  } else {
+                      Text(
+                          initials,
+                          Modifier.align(Alignment.Center),
+                          color = Color.White.copy(alpha = 0.25f),
+                          fontSize = if (big) 84.sp else 34.sp,
+                          fontWeight = FontWeight.Black
+                      )
+                  }
+                  Text(
+                      p.display,
+                      Modifier
+                          .align(Alignment.TopStart)
+                          .padding(if (big) 14.dp else 7.dp)
+                          .clip(RoundedCornerShape(50))
+                          .background(Color(0x66000000))
+                          .padding(horizontal = 8.dp, vertical = 2.dp),
+                      color = Color.White,
+                      fontSize = if (big) 12.sp else 9.sp,
+                      fontWeight = FontWeight.Bold,
+                      letterSpacing = 0.8.sp
+                  )
+                  if (showLabel) {
+                      Box(
+                          Modifier
+                              .align(Alignment.BottomCenter)
+                              .fillMaxWidth()
+                              .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC000000))))
+                              .padding(horizontal = 8.dp, vertical = 7.dp)
+                      ) {
+                          Text(
+                              game.name,
+                              color = Color.White,
+                              fontSize = if (big) 16.sp else 11.sp,
+                              fontWeight = FontWeight.Bold,
+                              maxLines = 2,
+                              overflow = TextOverflow.Ellipsis
+                          )
+                      }
+                  }
+              }
+          }
+
+          enum class NavTab(val label: String, val icon: ImageVector) {
+              HOME("Oyunlar", Icons.Rounded.SportsEsports),
+              CONSOLES("Konsollar", Icons.Rounded.Memory),
+              BROWSER("Tarayici", Icons.Rounded.Language),
+              SETTINGS("Ayarlar", Icons.Rounded.Settings)
+          }
+
+          @Composable
+          fun MiniLogo(logoSize: Dp) {
+              val inf = rememberInfiniteTransition(label = "mini")
+              val rot by inf.animateFloat(
+                  0f, 360f,
+                  infiniteRepeatable(tween(8000, easing = LinearEasing)),
+                  label = "rot"
+              )
+              Canvas(Modifier.size(logoSize)) {
+                  val r = this.size.minDimension / 2f
+                  rotate(rot, center) {
+                      drawPath(
+                          hexPath(center.x, center.y, r * 0.9f),
+                          Brush.linearGradient(listOf(AC.Cyan, AC.Blue)),
+                          style = Stroke(width = r * 0.18f)
+                      )
+                  }
+                  drawPath(hexPath(center.x, center.y, r * 0.45f), AC.Blue)
+              }
+          }
+
+          @Composable
+          fun EqBars(active: Boolean) {
+              val inf = rememberInfiniteTransition(label = "eq")
+              val durations = listOf(520, 380, 640, 450)
+              Row(
+                  Modifier.height(18.dp),
+                  verticalAlignment = Alignment.Bottom,
+                  horizontalArrangement = Arrangement.spacedBy(3.dp)
+              ) {
+                  durations.forEachIndexed { i, d ->
+                      val h by inf.animateFloat(
+                          0.25f, 1f,
+                          infiniteRepeatable(tween(d, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                          label = "eq$i"
+                      )
+                      Box(
+                          Modifier
+                              .width(3.dp)
+                              .fillMaxHeight(if (active) h else 0.2f)
+                              .clip(RoundedCornerShape(2.dp))
+                              .background(AC.Cyan)
+                      )
+                  }
+              }
+          }
+
+          @Composable
+          fun Clock() {
+              val fmt = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+              var t by remember { mutableStateOf(fmt.format(Date())) }
+              LaunchedEffect(Unit) {
+                  while (true) {
+                      t = fmt.format(Date())
+                      delay(1000)
+                  }
+              }
+              Text(t, color = AC.Text, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+          }
+
+          @Composable
+          fun NavItem(tab: NavTab, selected: Boolean, onClick: () -> Unit) {
+              val bg by animateColorAsState(
+                  if (selected) Color(0x33FFFFFF) else Color.Transparent,
+                  tween(300), label = "navBg"
+              )
+              val tint by animateColorAsState(if (selected) AC.Cyan else AC.Muted, tween(300), label = "navTint")
+              Row(
+                  Modifier
+                      .bounceClick(onClick = onClick)
+                      .clip(RoundedCornerShape(50))
+                      .background(bg)
+                      .padding(horizontal = 14.dp, vertical = 8.dp),
+                  verticalAlignment = Alignment.CenterVertically
+              ) {
+                  Icon(tab.icon, null, tint = tint, modifier = Modifier.size(20.dp))
+                  AnimatedVisibility(visible = selected) {
+                      Text(
+                          tab.label,
+                          Modifier.padding(start = 8.dp),
+                          color = AC.Text,
+                          fontSize = 13.sp,
+                          fontWeight = FontWeight.SemiBold,
+                          maxLines = 1,
+                          softWrap = false
+                      )
+                  }
+              }
+          }
+
+          @Composable
+          fun TopNav(current: NavTab, musicOn: Boolean, onTab: (NavTab) -> Unit) {
+              Row(
+                  Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp),
+                  verticalAlignment = Alignment.CenterVertically
+              ) {
+                  MiniLogo(24.dp)
+                  Spacer(Modifier.width(8.dp))
+                  Text("ALL", color = AC.Text, fontSize = 16.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
+                  Text("CORE", color = AC.Cyan, fontSize = 16.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
+                  Spacer(Modifier.weight(1f))
+                  Row(
+                      Modifier.clip(RoundedCornerShape(50)).background(Color(0x14FFFFFF)).padding(4.dp),
+                      horizontalArrangement = Arrangement.spacedBy(2.dp)
+                  ) {
+                      NavTab.values().forEach { t -> NavItem(t, t == current) { onTab(t) } }
+                  }
+                  Spacer(Modifier.weight(1f))
+                  EqBars(musicOn)
+                  Spacer(Modifier.width(14.dp))
+                  Clock()
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/ui/SplashScreen.kt
+          package com.allcore.emulator.ui
+
+          import androidx.compose.animation.core.Animatable
+          import androidx.compose.animation.core.FastOutSlowInEasing
+          import androidx.compose.animation.core.LinearEasing
+          import androidx.compose.animation.core.RepeatMode
+          import androidx.compose.animation.core.animateFloat
+          import androidx.compose.animation.core.infiniteRepeatable
+          import androidx.compose.animation.core.rememberInfiniteTransition
+          import androidx.compose.animation.core.spring
+          import androidx.compose.animation.core.tween
+          import androidx.compose.foundation.Canvas
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.size
+          import androidx.compose.foundation.layout.width
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.LaunchedEffect
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.remember
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.geometry.Offset
+          import androidx.compose.ui.geometry.Size
+          import androidx.compose.ui.graphics.Brush
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.graphics.StrokeCap
+          import androidx.compose.ui.graphics.drawscope.Stroke
+          import androidx.compose.ui.graphics.drawscope.rotate
+          import androidx.compose.ui.graphics.graphicsLayer
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.unit.Dp
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.allcore.emulator.util.Sfx
+          import kotlinx.coroutines.delay
+          import kotlinx.coroutines.launch
+
+          @Composable
+          fun LogoMark(logoSize: Dp, modifier: Modifier = Modifier) {
+              val inf = rememberInfiniteTransition(label = "logo")
+              val rot by inf.animateFloat(
+                  0f, 360f,
+                  infiniteRepeatable(tween(5000, easing = LinearEasing)),
+                  label = "rot"
+              )
+              val pulse by inf.animateFloat(
+                  0.92f, 1.08f,
+                  infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                  label = "pulse"
+              )
+              Canvas(modifier.size(logoSize)) {
+                  val c = center
+                  val r = this.size.minDimension / 2f
+                  rotate(rot, c) {
+                      drawArc(
+                          brush = Brush.sweepGradient(
+                              listOf(Color.Transparent, AC.Cyan, AC.Blue, Color.Transparent),
+                              center = c
+                          ),
+                          startAngle = 0f,
+                          sweepAngle = 300f,
+                          useCenter = false,
+                          topLeft = Offset(c.x - r * 0.92f, c.y - r * 0.92f),
+                          size = Size(r * 1.84f, r * 1.84f),
+                          style = Stroke(width = r * 0.07f, cap = StrokeCap.Round)
+                      )
+                  }
+                  val hex = hexPath(c.x, c.y, r * 0.62f * pulse)
+                  drawPath(
+                      hex,
+                      Brush.linearGradient(
+                          listOf(AC.Blue, AC.Violet),
+                          start = Offset.Zero,
+                          end = Offset(this.size.width, this.size.height)
+                      )
+                  )
+                  drawPath(hex, Color.White.copy(alpha = 0.9f), style = Stroke(width = r * 0.03f))
+                  drawPath(hexPath(c.x, c.y, r * 0.28f * pulse), Color.White.copy(alpha = 0.9f))
+              }
+          }
+
+          @Composable
+          fun SplashLetter(ch: Char, i: Int) {
+              val a = remember { Animatable(0f) }
+              LaunchedEffect(Unit) {
+                  delay(500L + i * 110L)
+                  a.animateTo(1f, spring(dampingRatio = 0.6f, stiffness = 200f))
+              }
+              Text(
+                  ch.toString(),
+                  color = if (i < 3) Color.White else AC.Cyan,
+                  fontSize = 52.sp,
+                  fontWeight = FontWeight.Black,
+                  letterSpacing = 6.sp,
+                  modifier = Modifier.graphicsLayer {
+                      alpha = a.value.coerceIn(0f, 1f)
+                      translationY = (1f - a.value) * 60f
+                      scaleX = 0.6f + 0.4f * a.value
+                      scaleY = 0.6f + 0.4f * a.value
+                  }
+              )
+          }
+
+          @Composable
+          fun SplashScreen(onDone: () -> Unit) {
+              val prog = remember { Animatable(0f) }
+              val sub = remember { Animatable(0f) }
+              val inf = rememberInfiniteTransition(label = "splash")
+              val ring by inf.animateFloat(
+                  0f, 1f,
+                  infiniteRepeatable(tween(2600, easing = LinearEasing)),
+                  label = "ring"
+              )
+              LaunchedEffect(Unit) {
+                  Sfx.boot()
+                  launch { prog.animateTo(1f, tween(3000, easing = FastOutSlowInEasing)) }
+                  launch {
+                      delay(1500)
+                      sub.animateTo(1f, tween(700))
+                  }
+                  delay(3500)
+                  onDone()
+              }
+              Box(
+                  Modifier
+                      .fillMaxSize()
+                      .background(Brush.radialGradient(listOf(Color(0xFF0D1B3D), AC.Bg0))),
+                  contentAlignment = Alignment.Center
+              ) {
+                  Canvas(Modifier.fillMaxSize()) {
+                      for (i in 0 until 3) {
+                          val ph = (ring + i / 3f) % 1f
+                          drawCircle(
+                              AC.Cyan.copy(alpha = (1f - ph) * 0.35f),
+                              radius = size.height * (0.15f + ph * 0.75f),
+                              center = center,
+                              style = Stroke(width = 2f)
+                          )
+                      }
+                  }
+                  Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                      LogoMark(88.dp)
+                      Spacer(Modifier.height(6.dp))
+                      Row { "ALLCORE".forEachIndexed { i, ch -> SplashLetter(ch, i) } }
+                      Text(
+                          "Tum emulatorler tek merkezde",
+                          color = AC.Muted,
+                          fontSize = 13.sp,
+                          letterSpacing = 2.sp,
+                          modifier = Modifier.graphicsLayer { alpha = sub.value }
+                      )
+                      Spacer(Modifier.height(16.dp))
+                      ProgressBar(prog.value, Modifier.width(220.dp))
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/ui/LibraryScreen.kt
+          package com.allcore.emulator.ui
+
+          import androidx.compose.animation.AnimatedContent
+          import androidx.compose.animation.Crossfade
+          import androidx.compose.animation.core.Animatable
+          import androidx.compose.animation.core.FastOutSlowInEasing
+          import androidx.compose.animation.core.LinearEasing
+          import androidx.compose.animation.core.RepeatMode
+          import androidx.compose.animation.core.animateDpAsState
+          import androidx.compose.animation.core.animateFloat
+          import androidx.compose.animation.core.animateFloatAsState
+          import androidx.compose.animation.core.infiniteRepeatable
+          import androidx.compose.animation.core.rememberInfiniteTransition
+          import androidx.compose.animation.core.spring
+          import androidx.compose.animation.core.tween
+          import androidx.compose.animation.fadeIn
+          import androidx.compose.animation.fadeOut
+          import androidx.compose.animation.slideInVertically
+          import androidx.compose.animation.togetherWith
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.border
+          import androidx.compose.foundation.focusable
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.BoxWithConstraints
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.PaddingValues
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxHeight
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.layout.size
+          import androidx.compose.foundation.layout.width
+          import androidx.compose.foundation.lazy.LazyRow
+          import androidx.compose.foundation.lazy.itemsIndexed
+          import androidx.compose.foundation.lazy.rememberLazyListState
+          import androidx.compose.foundation.shape.CircleShape
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.rounded.Add
+          import androidx.compose.material.icons.rounded.Info
+          import androidx.compose.material.icons.rounded.PlayArrow
+          import androidx.compose.material.icons.rounded.Security
+          import androidx.compose.material.icons.rounded.Star
+          import androidx.compose.material.icons.rounded.StarBorder
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.LaunchedEffect
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.remember
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.draw.shadow
+          import androidx.compose.ui.focus.FocusRequester
+          import androidx.compose.ui.focus.focusRequester
+          import androidx.compose.ui.graphics.Brush
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.graphics.graphicsLayer
+          import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+          import androidx.compose.ui.input.key.Key
+          import androidx.compose.ui.input.key.KeyEventType
+          import androidx.compose.ui.input.key.key
+          import androidx.compose.ui.input.key.onPreviewKeyEvent
+          import androidx.compose.ui.input.key.type
+          import androidx.compose.ui.platform.LocalContext
+          import androidx.compose.ui.platform.LocalHapticFeedback
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.text.style.TextOverflow
+          import androidx.compose.ui.unit.Dp
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.allcore.emulator.data.Game
+          import com.allcore.emulator.emulator.EmulatorRegistry
+          import com.allcore.emulator.emulator.GameLauncher
+          import com.allcore.emulator.util.FileHelper
+          import com.allcore.emulator.util.Platform
+          import com.allcore.emulator.util.Sfx
+          import kotlinx.coroutines.delay
+          import kotlin.math.min
+
+          @Composable
+          fun LibraryScreen(
+              games: List<Game>,
+              selIndex: Int,
+              onSel: (Int) -> Unit,
+              onOpen: (Game) -> Unit,
+              onAdd: () -> Unit,
+              onToggleFav: (Game) -> Unit,
+              onAccent: (Color) -> Unit
+          ) {
+              val ctx = LocalContext.current
+              val tick = rememberResumeTick()
+              val needPerm = remember(tick) { FileHelper.needsAllFiles() }
+              val sel = if (games.isEmpty()) 0 else selIndex.coerceIn(0, games.size - 1)
+              val current = games.getOrNull(sel)
+              val accent = if (current != null) Color(Platform.fromDisplay(current.platform).color) else AC.Blue
+              LaunchedEffect(accent) { onAccent(accent) }
+
+              val listState = rememberLazyListState()
+              LaunchedEffect(sel, games.size) {
+                  if (games.isNotEmpty()) listState.animateScrollToItem(sel)
+              }
+              val focus = remember { FocusRequester() }
+              LaunchedEffect(Unit) {
+                  try {
+                      focus.requestFocus()
+                  } catch (e: Exception) {
+                  }
+              }
+              val haptic = LocalHapticFeedback.current
+              val inf = rememberInfiniteTransition(label = "wm")
+              val drift by inf.animateFloat(
+                  -1f, 1f,
+                  infiniteRepeatable(tween(5000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                  label = "drift"
+              )
+
+              BoxWithConstraints(
+                  Modifier
+                      .fillMaxSize()
+                      .focusRequester(focus)
+                      .onPreviewKeyEvent { e ->
+                          if (e.type != KeyEventType.KeyDown || games.isEmpty()) {
+                              false
+                          } else when (e.key) {
+                              Key.DirectionRight -> {
+                                  if (sel < games.size - 1) {
+                                      Sfx.move()
+                                      onSel(sel + 1)
+                                  }
+                                  true
+                              }
+                              Key.DirectionLeft -> {
+                                  if (sel > 0) {
+                                      Sfx.move()
+                                      onSel(sel - 1)
+                                  }
+                                  true
+                              }
+                              Key.Enter, Key.NumPadEnter, Key.ButtonA -> {
+                                  Sfx.select()
+                                  GameLauncher.play(ctx, games[sel])
+                                  true
+                              }
+                              else -> false
+                          }
+                      }
+                      .focusable()
+              ) {
+                  val tile = (maxHeight * 0.28f).coerceIn(88.dp, 150.dp)
+                  Column(Modifier.fillMaxSize()) {
+                      Box(
+                          Modifier
+                              .weight(1f)
+                              .fillMaxWidth()
+                              .padding(horizontal = 40.dp)
+                      ) {
+                          Box(Modifier.align(Alignment.CenterEnd)) {
+                              Crossfade(
+                                  targetState = current?.platform ?: "",
+                                  animationSpec = tween(500),
+                                  label = "watermark"
+                              ) { name ->
+                                  Text(
+                                      name,
+                                      modifier = Modifier.graphicsLayer { translationX = drift * 24f },
+                                      color = Color.White.copy(alpha = 0.07f),
+                                      fontSize = 130.sp,
+                                      fontWeight = FontWeight.Black,
+                                      maxLines = 1
+                                  )
+                              }
+                          }
+                          AnimatedContent(
+                              targetState = current?.id,
+                              modifier = Modifier.fillMaxSize(),
+                              transitionSpec = {
+                                  (fadeIn(tween(450, delayMillis = 100)) +
+                                      slideInVertically(tween(450, delayMillis = 100)) { it / 8 }) togetherWith
+                                      fadeOut(tween(180))
+                              },
+                              label = "hero"
+                          ) { id ->
+                              val g = games.firstOrNull { it.id == id }
+                              if (g == null) {
+                                  EmptyHero(onAdd)
+                              } else {
+                                  HeroInfo(g, tick, onOpen, onToggleFav)
+                              }
+                          }
+                          AddFab(onAdd, Modifier.align(Alignment.BottomEnd))
+                          if (needPerm) {
+                              Row(
+                                  Modifier
+                                      .align(Alignment.TopEnd)
+                                      .bounceClick { FileHelper.requestAllFiles(ctx) }
+                                      .clip(RoundedCornerShape(50))
+                                      .background(AC.Orange.copy(alpha = 0.18f))
+                                      .border(1.dp, AC.Orange.copy(alpha = 0.6f), RoundedCornerShape(50))
+                                      .padding(horizontal = 12.dp, vertical = 6.dp),
+                                  verticalAlignment = Alignment.CenterVertically
+                              ) {
+                                  Icon(Icons.Rounded.Security, null, tint = AC.Orange, modifier = Modifier.size(16.dp))
+                                  Spacer(Modifier.width(6.dp))
+                                  Text(
+                                      "Tum dosyalara erisim izni ver",
+                                      color = AC.Orange,
+                                      fontSize = 11.sp,
+                                      fontWeight = FontWeight.SemiBold
+                                  )
+                              }
+                          }
+                      }
+                      LazyRow(
+                          state = listState,
+                          contentPadding = PaddingValues(start = 40.dp, end = 160.dp),
+                          horizontalArrangement = Arrangement.spacedBy(20.dp),
+                          verticalAlignment = Alignment.CenterVertically,
+                          modifier = Modifier.fillMaxWidth().height(tile * 1.3f + 10.dp)
+                      ) {
+                          itemsIndexed(games, key = { _, g -> g.id }) { i, g ->
+                              GameTile(g, i, i == sel, tile) {
+                                  if (i == sel) {
+                                      Sfx.select()
+                                      onOpen(g)
+                                  } else {
+                                      Sfx.move()
+                                      haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                      onSel(i)
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          fun HeroInfo(g: Game, tick: Int, onOpen: (Game) -> Unit, onToggleFav: (Game) -> Unit) {
+              val ctx = LocalContext.current
+              val p = Platform.fromDisplay(g.platform)
+              val c = Color(p.color)
+              val bridge = EmulatorRegistry.bridgeFor(p)
+              val installed = remember(tick, g.id) { bridge?.isInstalled(ctx) ?: false }
+              Column(
+                  Modifier.fillMaxHeight().fillMaxWidth(0.66f),
+                  verticalArrangement = Arrangement.Center
+              ) {
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                      Chip(p.title.uppercase(), c)
+                      Spacer(Modifier.width(12.dp))
+                      StatusDot(installed)
+                      Spacer(Modifier.width(6.dp))
+                      Text(
+                          if (bridge == null) "Emulator yok"
+                          else if (installed) "${bridge.displayName} hazir"
+                          else "${bridge.displayName} kurulu degil",
+                          color = AC.Muted,
+                          fontSize = 12.sp
+                      )
+                  }
+                  Spacer(Modifier.height(8.dp))
+                  Text(
+                      g.name,
+                      color = AC.Text,
+                      fontSize = 30.sp,
+                      lineHeight = 34.sp,
+                      fontWeight = FontWeight.Black,
+                      maxLines = 2,
+                      overflow = TextOverflow.Ellipsis
+                  )
+                  Spacer(Modifier.height(14.dp))
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                      AcButton("Oyna", Icons.Rounded.PlayArrow, BtnKind.Primary) { GameLauncher.play(ctx, g) }
+                      Spacer(Modifier.width(12.dp))
+                      AcButton("Detaylar", Icons.Rounded.Info, BtnKind.Glass) { onOpen(g) }
+                      Spacer(Modifier.width(12.dp))
+                      IconPill(
+                          if (g.favorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                          { onToggleFav(g) },
+                          tint = if (g.favorite) AC.Gold else AC.Text
+                      )
+                  }
+              }
+          }
+
+          @Composable
+          fun EmptyHero(onAdd: () -> Unit) {
+              val inf = rememberInfiniteTransition(label = "empty")
+              val pulse by inf.animateFloat(
+                  0.9f, 1.1f,
+                  infiniteRepeatable(tween(1300, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                  label = "pulse"
+              )
+              Column(
+                  Modifier.fillMaxHeight().fillMaxWidth(0.66f),
+                  verticalArrangement = Arrangement.Center
+              ) {
+                  Box(
+                      Modifier
+                          .size(56.dp)
+                          .graphicsLayer {
+                              scaleX = pulse
+                              scaleY = pulse
+                          }
+                          .clip(CircleShape)
+                          .background(Brush.linearGradient(listOf(AC.Blue, AC.Violet))),
+                      contentAlignment = Alignment.Center
+                  ) {
+                      Icon(Icons.Rounded.Add, null, tint = Color.White, modifier = Modifier.size(30.dp))
+                  }
+                  Spacer(Modifier.height(14.dp))
+                  Text("Henuz oyun yok", color = AC.Text, fontSize = 32.sp, fontWeight = FontWeight.Black)
+                  Spacer(Modifier.height(4.dp))
+                  Text(
+                      "+ butonuyla ilk oyununu ekle ya da Tarayici sekmesinden indir",
+                      color = AC.Muted,
+                      fontSize = 14.sp
+                  )
+                  Spacer(Modifier.height(14.dp))
+                  AcButton("Oyun Ekle", Icons.Rounded.Add, BtnKind.Primary) { onAdd() }
+              }
+          }
+
+          @Composable
+          fun AddFab(onClick: () -> Unit, modifier: Modifier = Modifier) {
+              val inf = rememberInfiniteTransition(label = "fab")
+              val ring by inf.animateFloat(
+                  0f, 1f,
+                  infiniteRepeatable(tween(1800, easing = LinearEasing)),
+                  label = "ring"
+              )
+              Box(modifier.size(76.dp), contentAlignment = Alignment.Center) {
+                  Box(
+                      Modifier
+                          .size(56.dp)
+                          .graphicsLayer {
+                              scaleX = 1f + ring * 0.6f
+                              scaleY = 1f + ring * 0.6f
+                              alpha = 1f - ring
+                          }
+                          .border(2.dp, AC.Cyan, CircleShape)
+                  )
+                  Box(
+                      Modifier
+                          .size(56.dp)
+                          .bounceClick(onClick = onClick)
+                          .clip(CircleShape)
+                          .background(Brush.linearGradient(listOf(AC.Blue, AC.Violet))),
+                      contentAlignment = Alignment.Center
+                  ) {
+                      Icon(Icons.Rounded.Add, "Ekle", tint = Color.White, modifier = Modifier.size(30.dp))
+                  }
+              }
+          }
+
+          @Composable
+          fun GameTile(game: Game, index: Int, selected: Boolean, tile: Dp, onClick: () -> Unit) {
+              val c = Color(Platform.fromDisplay(game.platform).color)
+              val sc by animateFloatAsState(
+                  if (selected) 1.16f else 1f,
+                  spring(dampingRatio = 0.55f, stiffness = 320f),
+                  label = "tileScale"
+              )
+              val dim by animateFloatAsState(if (selected) 1f else 0.6f, tween(320), label = "tileDim")
+              val elev by animateDpAsState(if (selected) 24.dp else 0.dp, tween(320), label = "tileElev")
+              val enter = remember { Animatable(0f) }
+              LaunchedEffect(Unit) {
+                  delay(min(index, 8) * 70L)
+                  enter.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
+              }
+              val inf = rememberInfiniteTransition(label = "tilePulse")
+              val pulse by inf.animateFloat(
+                  0.45f, 1f,
+                  infiniteRepeatable(tween(1000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                  label = "pulse"
+              )
+              val shape = RoundedCornerShape(18.dp)
+              Box(
+                  Modifier
+                      .size(tile)
+                      .graphicsLayer {
+                          scaleX = sc
+                          scaleY = sc
+                          alpha = dim * enter.value
+                          translationY = (1f - enter.value) * 70f
+                      }
+                      .shadow(elev, shape, ambientColor = c, spotColor = c)
+                      .bounceClick(sound = false, onClick = onClick)
+                      .clip(shape)
+                      .border(
+                          if (selected) 3.dp else 1.dp,
+                          if (selected) Color.White.copy(alpha = pulse) else AC.GlassStroke,
+                          shape
+                      )
+              ) {
+                  GameCover(game, Modifier.fillMaxSize())
+                  if (game.favorite) {
+                      Icon(
+                          Icons.Rounded.Star,
+                          null,
+                          tint = AC.Gold,
+                          modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(18.dp)
+                      )
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/ui/GameDetailScreen.kt
+          package com.allcore.emulator.ui
+
+          import androidx.compose.animation.core.FastOutSlowInEasing
+          import androidx.compose.animation.core.RepeatMode
+          import androidx.compose.animation.core.animateFloat
+          import androidx.compose.animation.core.infiniteRepeatable
+          import androidx.compose.animation.core.rememberInfiniteTransition
+          import androidx.compose.animation.core.tween
+          import androidx.compose.foundation.horizontalScroll
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.aspectRatio
+          import androidx.compose.foundation.layout.fillMaxHeight
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.layout.width
+          import androidx.compose.foundation.rememberScrollState
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.foundation.verticalScroll
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.rounded.Delete
+          import androidx.compose.material.icons.rounded.PlayArrow
+          import androidx.compose.material.icons.rounded.Star
+          import androidx.compose.material.icons.rounded.StarBorder
+          import androidx.compose.material.icons.rounded.Tune
+          import androidx.compose.material3.AlertDialog
+          import androidx.compose.material3.Text
+          import androidx.compose.material3.TextButton
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.LaunchedEffect
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.draw.shadow
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.graphics.graphicsLayer
+          import androidx.compose.ui.platform.LocalContext
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.allcore.emulator.data.Game
+          import com.allcore.emulator.emulator.EmulatorRegistry
+          import com.allcore.emulator.emulator.GameLauncher
+          import com.allcore.emulator.util.Platform
+          import com.allcore.emulator.util.Sfx
+          import java.io.File
+          import java.text.SimpleDateFormat
+          import java.util.Date
+          import java.util.Locale
+
+          @Composable
+          fun GameDetailScreen(
+              game: Game,
+              onBack: () -> Unit,
+              onToggleFav: () -> Unit,
+              onDelete: () -> Unit,
+              onAccent: (Color) -> Unit
+          ) {
+              val ctx = LocalContext.current
+              val p = Platform.fromDisplay(game.platform)
+              val c = Color(p.color)
+              LaunchedEffect(c) { onAccent(c) }
+              val tick = rememberResumeTick()
+              val bridge = EmulatorRegistry.bridgeFor(p)
+              val installed = remember(tick) { bridge?.isInstalled(ctx) ?: false }
+              val file = remember(game.filePath) { File(game.filePath) }
+              val exists = remember(game.filePath, tick) { file.exists() }
+              val sizeText = remember(game.filePath, tick) {
+                  if (file.exists()) {
+                      val mb = file.length() / (1024.0 * 1024.0)
+                      if (mb >= 1024) String.format(Locale.US, "%.2f GB", mb / 1024.0)
+                      else String.format(Locale.US, "%.1f MB", mb)
+                  } else "-"
+              }
+              val dateText = remember(game.addedAt) {
+                  SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(game.addedAt))
+              }
+              var confirm by remember { mutableStateOf(false) }
+              val inf = rememberInfiniteTransition(label = "detail")
+              val floatY by inf.animateFloat(
+                  -8f, 8f,
+                  infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                  label = "float"
+              )
+
+              Column(Modifier.fillMaxSize()) {
+                  ScreenHeader(game.name, onBack = { Sfx.back(); onBack() }) {
+                      IconPill(
+                          if (game.favorite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                          onToggleFav,
+                          tint = if (game.favorite) AC.Gold else AC.Text
+                      )
+                      Spacer(Modifier.width(10.dp))
+                      IconPill(Icons.Rounded.Delete, { confirm = true }, tint = AC.Danger)
+                  }
+                  Row(
+                      Modifier
+                          .weight(1f)
+                          .fillMaxWidth()
+                          .padding(horizontal = 40.dp, vertical = 8.dp),
+                      horizontalArrangement = Arrangement.spacedBy(36.dp)
+                  ) {
+                      Reveal(0, Modifier.fillMaxHeight().aspectRatio(1f)) {
+                          val shape = RoundedCornerShape(26.dp)
+                          GameCover(
+                              game,
+                              Modifier
+                                  .fillMaxSize()
+                                  .graphicsLayer { translationY = floatY * 2f }
+                                  .shadow(28.dp, shape, ambientColor = c, spotColor = c)
+                                  .clip(shape),
+                              big = true
+                          )
+                      }
+                      Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                          Column(Modifier.verticalScroll(rememberScrollState())) {
+                              Reveal(80) { Chip(p.title.uppercase(), c) }
+                              Spacer(Modifier.height(8.dp))
+                              Reveal(140) {
+                                  Text(
+                                      game.name,
+                                      color = AC.Text,
+                                      fontSize = 26.sp,
+                                      lineHeight = 30.sp,
+                                      fontWeight = FontWeight.Black,
+                                      maxLines = 2
+                                  )
+                              }
+                              Spacer(Modifier.height(10.dp))
+                              Reveal(200) {
+                                  Column(Modifier.fillMaxWidth()) {
+                                      InfoRow("Platform", p.title, c)
+                                      InfoRow("Dosya adi", file.name)
+                                      InfoRow("Boyut", sizeText)
+                                      InfoRow("Eklenme", dateText)
+                                      InfoRow("Emulator", bridge?.displayName ?: "Yok")
+                                      InfoRow(
+                                          "Durum",
+                                          if (!exists) "Dosya bulunamadi"
+                                          else if (installed) "Oynamaya hazir"
+                                          else "Emulator kurulu degil",
+                                          if (exists && installed) AC.Green else AC.Orange
+                                      )
+                                  }
+                              }
+                              Spacer(Modifier.height(14.dp))
+                              Reveal(320) {
+                                  Row(
+                                      Modifier.horizontalScroll(rememberScrollState()),
+                                      horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                      verticalAlignment = Alignment.CenterVertically
+                                  ) {
+                                      AcButton("Oyna", Icons.Rounded.PlayArrow, BtnKind.Primary) {
+                                          GameLauncher.play(ctx, game)
+                                      }
+                                      AcButton("Emulator Ayarlari", Icons.Rounded.Tune, BtnKind.Glass, compact = true) {
+                                          GameLauncher.openSettings(ctx, game)
+                                      }
+                                      AcButton("Kutuphaneden Sil", Icons.Rounded.Delete, BtnKind.Danger, compact = true) {
+                                          confirm = true
+                                      }
+                                  }
+                              }
+                              Spacer(Modifier.height(12.dp))
+                          }
+                      }
+                  }
+              }
+
+              if (confirm) {
+                  AlertDialog(
+                      onDismissRequest = { confirm = false },
+                      containerColor = AC.Bg1,
+                      title = { Text("Oyunu sil", color = AC.Text, fontWeight = FontWeight.Bold) },
+                      text = {
+                          Text(
+                              "${game.name} kutuphaneden silinecek. Kopyalanan oyun dosyasi da silinir.",
+                              color = AC.Muted
+                          )
+                      },
+                      confirmButton = {
+                          TextButton(onClick = {
+                              confirm = false
+                              onDelete()
+                          }) { Text("Sil", color = AC.Danger, fontWeight = FontWeight.Bold) }
+                      },
+                      dismissButton = {
+                          TextButton(onClick = { confirm = false }) { Text("Vazgec", color = AC.Text) }
+                      }
+                  )
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/ui/AddGameScreen.kt
+          package com.allcore.emulator.ui
+
+          import android.net.Uri
+          import androidx.activity.compose.rememberLauncherForActivityResult
+          import androidx.activity.result.contract.ActivityResultContracts
+          import androidx.compose.animation.animateColorAsState
+          import androidx.compose.animation.core.FastOutSlowInEasing
+          import androidx.compose.animation.core.RepeatMode
+          import androidx.compose.animation.core.animateFloat
+          import androidx.compose.animation.core.infiniteRepeatable
+          import androidx.compose.animation.core.rememberInfiniteTransition
+          import androidx.compose.animation.core.tween
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.border
+          import androidx.compose.foundation.horizontalScroll
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxHeight
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.layout.size
+          import androidx.compose.foundation.rememberScrollState
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.foundation.verticalScroll
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.rounded.Add
+          import androidx.compose.material.icons.rounded.FolderOpen
+          import androidx.compose.material3.Icon
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.LaunchedEffect
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableFloatStateOf
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.rememberCoroutineScope
+          import androidx.compose.runtime.setValue
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.graphics.graphicsLayer
+          import androidx.compose.ui.platform.LocalContext
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.text.style.TextAlign
+          import androidx.compose.ui.text.style.TextOverflow
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.allcore.emulator.data.Game
+          import com.allcore.emulator.data.GameViewModel
+          import com.allcore.emulator.util.FileHelper
+          import com.allcore.emulator.util.Platform
+          import com.allcore.emulator.util.PlatformDetector
+          import com.allcore.emulator.util.Sfx
+          import com.allcore.emulator.util.toast
+          import kotlinx.coroutines.Dispatchers
+          import kotlinx.coroutines.launch
+          import kotlinx.coroutines.withContext
+
+          @Composable
+          fun InfoCard(label: String, value: String) {
+              Column(
+                  Modifier
+                      .fillMaxWidth()
+                      .glass(RoundedCornerShape(16.dp))
+                      .padding(horizontal = 16.dp, vertical = 12.dp)
+              ) {
+                  Text(label, color = AC.Muted, fontSize = 11.sp, letterSpacing = 1.sp)
+                  Spacer(Modifier.height(2.dp))
+                  Text(
+                      value,
+                      color = AC.Text,
+                      fontSize = 15.sp,
+                      fontWeight = FontWeight.SemiBold,
+                      maxLines = 2,
+                      overflow = TextOverflow.Ellipsis
+                  )
+              }
+          }
+
+          @Composable
+          fun SelectChip(text: String, selected: Boolean, color: Color, onClick: () -> Unit) {
+              val bg by animateColorAsState(
+                  if (selected) color.copy(alpha = 0.35f) else Color(0x14FFFFFF),
+                  tween(250), label = "chipBg"
+              )
+              val shape = RoundedCornerShape(50)
+              Text(
+                  text,
+                  Modifier
+                      .bounceClick(onClick = onClick)
+                      .clip(shape)
+                      .background(bg)
+                      .border(1.dp, if (selected) color else AC.GlassStroke, shape)
+                      .padding(horizontal = 14.dp, vertical = 7.dp),
+                  color = if (selected) Color.White else AC.Muted,
+                  fontSize = 12.sp,
+                  fontWeight = FontWeight.Bold,
+                  maxLines = 1
+              )
+          }
+
+          @Composable
+          fun AddGameScreen(
+              vm: GameViewModel,
+              onBack: () -> Unit,
+              onSaved: (Long) -> Unit,
+              onAccent: (Color) -> Unit
+          ) {
+              val ctx = LocalContext.current
+              val scope = rememberCoroutineScope()
+              var uri by remember { mutableStateOf<Uri?>(null) }
+              var fileName by remember { mutableStateOf("") }
+              var platform by remember { mutableStateOf(Platform.UNKNOWN) }
+              var saving by remember { mutableStateOf(false) }
+              var progress by remember { mutableFloatStateOf(0f) }
+
+              LaunchedEffect(platform) { onAccent(Color(platform.color)) }
+
+              val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { u ->
+                  if (u != null) {
+                      uri = u
+                      fileName = FileHelper.queryName(ctx, u)
+                      platform = PlatformDetector.detect(fileName)
+                  }
+              }
+
+              val inf = rememberInfiniteTransition(label = "add")
+              val bob by inf.animateFloat(
+                  -10f, 10f,
+                  infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                  label = "bob"
+              )
+
+              val canSave = uri != null && !saving &&
+                  (platform != Platform.UNKNOWN || fileName.endsWith(".zip", true))
+
+              val save: () -> Unit = {
+                  val u = uri
+                  if (u != null && !saving) {
+                      scope.launch {
+                          saving = true
+                          progress = 0f
+                          val result = withContext(Dispatchers.IO) {
+                              try {
+                                  val dest = FileHelper.uniqueFile(FileHelper.gamesDir(ctx), fileName)
+                                  FileHelper.copyFromUri(ctx, u, dest) { pr -> progress = pr }
+                                  FileHelper.resolveGameFile(dest)
+                              } catch (e: Exception) {
+                                  null
+                              }
+                          }
+                          saving = false
+                          if (result == null) {
+                              toast(ctx, "Dosya kopyalanamadi")
+                          } else {
+                              val plat = if (platform == Platform.UNKNOWN) PlatformDetector.detect(result.name) else platform
+                              if (plat == Platform.UNKNOWN) {
+                                  result.delete()
+                                  toast(ctx, "Desteklenmeyen dosya turu")
+                              } else {
+                                  val game = Game(
+                                      name = FileHelper.displayName(result.name),
+                                      filePath = result.absolutePath,
+                                      platform = plat.display
+                                  )
+                                  vm.addGame(game) { id ->
+                                      toast(ctx, "Kutuphaneye eklendi")
+                                      onSaved(id)
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+
+              Column(Modifier.fillMaxSize()) {
+                  ScreenHeader("Oyun Ekle", onBack = { Sfx.back(); onBack() })
+                  Row(
+                      Modifier
+                          .weight(1f)
+                          .fillMaxWidth()
+                          .padding(horizontal = 40.dp, vertical = 8.dp),
+                      horizontalArrangement = Arrangement.spacedBy(28.dp)
+                  ) {
+                      Reveal(0, Modifier.weight(1f).fillMaxHeight()) {
+                          Column(
+                              Modifier
+                                  .fillMaxSize()
+                                  .glass(RoundedCornerShape(26.dp))
+                                  .padding(20.dp),
+                              verticalArrangement = Arrangement.Center,
+                              horizontalAlignment = Alignment.CenterHorizontally
+                          ) {
+                              Icon(
+                                  Icons.Rounded.FolderOpen,
+                                  null,
+                                  tint = AC.Cyan,
+                                  modifier = Modifier
+                                      .size(64.dp)
+                                      .graphicsLayer { translationY = bob }
+                              )
+                              Spacer(Modifier.height(10.dp))
+                              Text("Oyun dosyasini sec", color = AC.Text, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                              Spacer(Modifier.height(4.dp))
+                              Text(
+                                  "PS1, PS2, PS3, PSP, EXE, APK ve daha fazlasi",
+                                  color = AC.Muted,
+                                  fontSize = 12.sp,
+                                  textAlign = TextAlign.Center
+                              )
+                              Spacer(Modifier.height(16.dp))
+                              AcButton("Dosya Sec", Icons.Rounded.FolderOpen, BtnKind.Primary) {
+                                  picker.launch(arrayOf("*/*"))
+                              }
+                          }
+                      }
+                      Reveal(120, Modifier.weight(1f).fillMaxHeight()) {
+                          Column(
+                              Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                              verticalArrangement = Arrangement.spacedBy(10.dp)
+                          ) {
+                              InfoCard("DOSYA", if (fileName.isEmpty()) "Henuz secilmedi" else fileName)
+                              InfoCard("ALGILANAN PLATFORM", if (uri == null) "-" else platform.title)
+                              Text("Platformu degistir", color = AC.Muted, fontSize = 12.sp)
+                              Row(
+                                  Modifier.horizontalScroll(rememberScrollState()),
+                                  horizontalArrangement = Arrangement.spacedBy(8.dp)
+                              ) {
+                                  Platform.values().filter { it != Platform.UNKNOWN }.forEach { pl ->
+                                      SelectChip(pl.display, platform == pl, Color(pl.color)) { platform = pl }
+                                  }
+                              }
+                              if (saving) {
+                                  Text(
+                                      "Kopyalaniyor %" + (progress * 100).toInt(),
+                                      color = AC.Cyan,
+                                      fontSize = 12.sp
+                                  )
+                                  ProgressBar(progress, Modifier.fillMaxWidth())
+                              }
+                              AcButton(
+                                  "Kutuphaneye Ekle",
+                                  Icons.Rounded.Add,
+                                  BtnKind.Primary,
+                                  enabled = canSave,
+                                  modifier = Modifier.fillMaxWidth()
+                              ) { save() }
+                              Spacer(Modifier.height(8.dp))
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/ui/ConsolesScreen.kt
+          package com.allcore.emulator.ui
+
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.PaddingValues
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.layout.width
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.lazy.LazyRow
+          import androidx.compose.foundation.lazy.itemsIndexed
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.rounded.Download
+          import androidx.compose.material.icons.rounded.PlayArrow
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.remember
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.graphics.Brush
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.platform.LocalContext
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.text.style.TextOverflow
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.allcore.emulator.emulator.EmulatorBridge
+          import com.allcore.emulator.emulator.EmulatorRegistry
+
+          @Composable
+          fun ConsolesScreen() {
+              val tick = rememberResumeTick()
+              val list = remember { EmulatorRegistry.all().toList() }
+              Column(Modifier.fillMaxSize().padding(top = 8.dp)) {
+                  Text(
+                      "Konsollar",
+                      Modifier.padding(horizontal = 40.dp),
+                      color = AC.Text,
+                      fontSize = 28.sp,
+                      fontWeight = FontWeight.Black
+                  )
+                  Text(
+                      "Desteklenen emulatorler ve kurulum durumu",
+                      Modifier.padding(horizontal = 40.dp),
+                      color = AC.Muted,
+                      fontSize = 13.sp
+                  )
+                  LazyRow(
+                      contentPadding = PaddingValues(horizontal = 40.dp, vertical = 18.dp),
+                      horizontalArrangement = Arrangement.spacedBy(18.dp),
+                      modifier = Modifier.fillMaxWidth()
+                  ) {
+                      itemsIndexed(list) { i, b ->
+                          Reveal(i * 80) { ConsoleCard(b, tick) }
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          fun ConsoleCard(b: EmulatorBridge, tick: Int) {
+              val ctx = LocalContext.current
+              val plats = remember(b) { EmulatorRegistry.platformsOf(b) }
+              val c = Color(plats.firstOrNull()?.color ?: 0xFF2F7BFF)
+              val installed = remember(tick, b) { b.isInstalled(ctx) }
+              val system = b.packageName.isEmpty()
+              Column(
+                  Modifier
+                      .width(240.dp)
+                      .glass(RoundedCornerShape(24.dp))
+                      .padding(18.dp)
+              ) {
+                  Box(
+                      Modifier
+                          .fillMaxWidth()
+                          .height(6.dp)
+                          .clip(RoundedCornerShape(50))
+                          .background(Brush.horizontalGradient(listOf(c, Color.Transparent)))
+                  )
+                  Spacer(Modifier.height(12.dp))
+                  Text(
+                      b.displayName,
+                      color = AC.Text,
+                      fontSize = 20.sp,
+                      fontWeight = FontWeight.Black,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis
+                  )
+                  Spacer(Modifier.height(4.dp))
+                  Text(
+                      plats.joinToString(" / ") { it.display },
+                      color = c,
+                      fontSize = 12.sp,
+                      fontWeight = FontWeight.Bold,
+                      maxLines = 2
+                  )
+                  Spacer(Modifier.height(8.dp))
+                  Text(
+                      "Formatlar: " + plats.flatMap { it.formats.split(", ") }.distinct().joinToString(", "),
+                      color = AC.Muted,
+                      fontSize = 11.sp,
+                      maxLines = 3,
+                      overflow = TextOverflow.Ellipsis
+                  )
+                  Spacer(Modifier.height(12.dp))
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                      StatusDot(installed)
+                      Spacer(Modifier.width(8.dp))
+                      Text(
+                          if (system) "Sistem" else if (installed) "Kurulu" else "Kurulu degil",
+                          color = AC.Text,
+                          fontSize = 12.sp
+                      )
+                  }
+                  Spacer(Modifier.height(12.dp))
+                  if (installed) {
+                      AcButton("Ac", Icons.Rounded.PlayArrow, BtnKind.Glass, compact = true) {
+                          if (!b.openEmulator(ctx)) b.openStore(ctx)
+                      }
+                  } else {
+                      AcButton("Yukle", Icons.Rounded.Download, BtnKind.Primary, compact = true) {
+                          b.openStore(ctx)
+                      }
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/ui/SettingsScreen.kt
+          package com.allcore.emulator.ui
+
+          import androidx.compose.foundation.layout.Arrangement
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxHeight
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.rememberScrollState
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.foundation.verticalScroll
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.rounded.Security
+          import androidx.compose.material3.Slider
+          import androidx.compose.material3.SliderDefaults
+          import androidx.compose.material3.Switch
+          import androidx.compose.material3.SwitchDefaults
+          import androidx.compose.material3.Text
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableFloatStateOf
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.platform.LocalContext
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.allcore.emulator.util.AmbientMusic
+          import com.allcore.emulator.util.FileHelper
+          import com.allcore.emulator.util.Prefs
+          import com.allcore.emulator.util.Sfx
+
+          @Composable
+          fun SettingToggle(title: String, sub: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+              Row(
+                  Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                  verticalAlignment = Alignment.CenterVertically
+              ) {
+                  Column(Modifier.weight(1f)) {
+                      Text(title, color = AC.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                      Text(sub, color = AC.Muted, fontSize = 12.sp)
+                  }
+                  Switch(
+                      checked = checked,
+                      onCheckedChange = onChange,
+                      colors = SwitchDefaults.colors(
+                          checkedThumbColor = Color.White,
+                          checkedTrackColor = AC.Blue,
+                          uncheckedThumbColor = AC.Muted,
+                          uncheckedTrackColor = AC.Glass,
+                          uncheckedBorderColor = AC.GlassStroke
+                      )
+                  )
+              }
+          }
+
+          @Composable
+          fun SettingsScreen(gameCount: Int, onMusic: (Boolean) -> Unit) {
+              val ctx = LocalContext.current
+              val tick = rememberResumeTick()
+              var music by remember { mutableStateOf(Prefs.music(ctx)) }
+              var sfx by remember { mutableStateOf(Prefs.sfx(ctx)) }
+              var vol by remember { mutableFloatStateOf(Prefs.musicVolume(ctx)) }
+              val hasAll = remember(tick) { FileHelper.hasAllFiles() }
+              val dir = remember(tick) { FileHelper.gamesDir(ctx).absolutePath }
+
+              Row(
+                  Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 12.dp),
+                  horizontalArrangement = Arrangement.spacedBy(24.dp)
+              ) {
+                  Reveal(0, Modifier.weight(1f)) {
+                      Column(
+                          Modifier
+                              .fillMaxHeight()
+                              .glass(RoundedCornerShape(24.dp))
+                              .verticalScroll(rememberScrollState())
+                              .padding(20.dp)
+                      ) {
+                          Text("Ses", color = AC.Cyan, fontSize = 13.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+                          Spacer(Modifier.height(6.dp))
+                          SettingToggle("Arka plan muzigi", "Menude yumusak ambient muzik cal", music) {
+                              music = it
+                              Prefs.setMusic(ctx, it)
+                              if (it) AmbientMusic.start() else AmbientMusic.pause()
+                              onMusic(it)
+                          }
+                          SettingToggle("Arayuz sesleri", "Gezinme ve secim sesleri", sfx) {
+                              sfx = it
+                              Prefs.setSfx(ctx, it)
+                              Sfx.enabled = it
+                          }
+                          Spacer(Modifier.height(6.dp))
+                          Text("Muzik seviyesi", color = AC.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                          Slider(
+                              value = vol,
+                              onValueChange = {
+                                  vol = it
+                                  AmbientMusic.applyVolume(it)
+                              },
+                              onValueChangeFinished = { Prefs.setMusicVolume(ctx, vol) },
+                              colors = SliderDefaults.colors(
+                                  thumbColor = AC.Cyan,
+                                  activeTrackColor = AC.Cyan,
+                                  inactiveTrackColor = AC.Glass
+                              )
+                          )
+                      }
+                  }
+                  Reveal(140, Modifier.weight(1f)) {
+                      Column(
+                          Modifier
+                              .fillMaxHeight()
+                              .glass(RoundedCornerShape(24.dp))
+                              .verticalScroll(rememberScrollState())
+                              .padding(20.dp)
+                      ) {
+                          Text("Depolama", color = AC.Cyan, fontSize = 13.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+                          Spacer(Modifier.height(6.dp))
+                          InfoRow("Oyun sayisi", gameCount.toString())
+                          InfoRow("Klasor", dir)
+                          InfoRow(
+                              "Tum dosyalar",
+                              if (hasAll) "Acik" else "Kapali",
+                              if (hasAll) AC.Green else AC.Orange
+                          )
+                          InfoRow("Surum", "AllCore 1.0")
+                          if (!hasAll) {
+                              Spacer(Modifier.height(12.dp))
+                              AcButton("Erisim izni ver", Icons.Rounded.Security, BtnKind.Primary, compact = true) {
+                                  FileHelper.requestAllFiles(ctx)
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/ui/BrowserScreen.kt
+          package com.allcore.emulator.ui
+
+          import android.annotation.SuppressLint
+          import android.app.DownloadManager
+          import android.content.BroadcastReceiver
+          import android.content.Context
+          import android.content.Intent
+          import android.content.IntentFilter
+          import android.graphics.Bitmap
+          import android.net.Uri
+          import android.os.Handler
+          import android.os.Looper
+          import android.view.ViewGroup
+          import android.webkit.CookieManager
+          import android.webkit.URLUtil
+          import android.webkit.WebChromeClient
+          import android.webkit.WebResourceRequest
+          import android.webkit.WebView
+          import android.webkit.WebViewClient
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.border
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.Row
+          import androidx.compose.foundation.layout.Spacer
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.foundation.layout.fillMaxWidth
+          import androidx.compose.foundation.layout.height
+          import androidx.compose.foundation.layout.padding
+          import androidx.compose.foundation.layout.width
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.foundation.text.KeyboardActions
+          import androidx.compose.foundation.text.KeyboardOptions
+          import androidx.compose.foundation.text.BasicTextField
+          import androidx.compose.material.icons.Icons
+          import androidx.compose.material.icons.rounded.ArrowBackIosNew
+          import androidx.compose.material.icons.rounded.ArrowForwardIos
+          import androidx.compose.material.icons.rounded.Home
+          import androidx.compose.material.icons.rounded.Refresh
+          import androidx.compose.material.icons.rounded.Search
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.DisposableEffect
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableFloatStateOf
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.focus.focusProperties
+          import androidx.compose.ui.graphics.SolidColor
+          import androidx.compose.ui.platform.LocalContext
+          import androidx.compose.ui.platform.LocalFocusManager
+          import androidx.compose.ui.text.TextStyle
+          import androidx.compose.ui.text.input.ImeAction
+          import androidx.compose.ui.text.input.KeyboardType
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import androidx.compose.ui.viewinterop.AndroidView
+          import androidx.core.content.ContextCompat
+          import com.allcore.emulator.data.Game
+          import com.allcore.emulator.data.GameViewModel
+          import com.allcore.emulator.util.DownloadTracker
+          import com.allcore.emulator.util.FileHelper
+          import com.allcore.emulator.util.Platform
+          import com.allcore.emulator.util.PlatformDetector
+          import com.allcore.emulator.util.toast
+          import kotlin.concurrent.thread
+
+          class BrowserHolder {
+              var webView: WebView? = null
+              var url by mutableStateOf("https://www.google.com")
+              var progress by mutableFloatStateOf(0f)
+              var loading by mutableStateOf(false)
+              var canBack by mutableStateOf(false)
+              var canForward by mutableStateOf(false)
+          }
+
+          fun normalizeUrl(input: String): String {
+              val t = input.trim()
+              if (t.isEmpty()) return "https://www.google.com"
+              if (t.startsWith("http://") || t.startsWith("https://")) return t
+              if (!t.contains(' ') && t.contains('.')) return "https://$t"
+              return "https://www.google.com/search?q=" + Uri.encode(t)
+          }
+
+          fun startDownload(ctx: Context, url: String, ua: String?, cd: String?, mime: String?) {
+              try {
+                  val dir = ctx.getExternalFilesDir("games")
+                  if (dir == null) {
+                      toast(ctx, "Depolama alani bulunamadi")
+                      return
+                  }
+                  val name = URLUtil.guessFileName(url, cd, mime)
+                  val file = FileHelper.uniqueFile(dir, name)
+                  val req = DownloadManager.Request(Uri.parse(url))
+                  req.setTitle(file.name)
+                  req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                  req.setDestinationInExternalFilesDir(ctx, "games", file.name)
+                  val cookie = CookieManager.getInstance().getCookie(url)
+                  if (cookie != null) req.addRequestHeader("Cookie", cookie)
+                  if (ua != null) req.addRequestHeader("User-Agent", ua)
+                  val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                  val id = dm.enqueue(req)
+                  DownloadTracker.pending[id] = file
+                  toast(ctx, "Indirme basladi: " + file.name)
+              } catch (e: Exception) {
+                  toast(ctx, "Indirme baslatilamadi")
+              }
+          }
+
+          // Indirme bitince dosyayi otomatik kutuphaneye ekler
+          @Composable
+          fun DownloadWatcher(vm: GameViewModel) {
+              val ctx = LocalContext.current
+              DisposableEffect(Unit) {
+                  val app = ctx.applicationContext
+                  val main = Handler(Looper.getMainLooper())
+                  val r = object : BroadcastReceiver() {
+                      override fun onReceive(c: Context, i: Intent) {
+                          val id = i.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+                          val f = DownloadTracker.pending.remove(id) ?: return
+                          thread(name = "allcore-dl") {
+                              var ok = false
+                              try {
+                                  val dm = app.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                                  val cur = dm.query(DownloadManager.Query().setFilterById(id))
+                                  if (cur != null) {
+                                      cur.use {
+                                          if (it.moveToFirst()) {
+                                              val st = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                                              ok = st == DownloadManager.STATUS_SUCCESSFUL
+                                          }
+                                      }
+                                  }
+                              } catch (e: Exception) {
+                              }
+                              if (!ok || !f.exists()) {
+                                  main.post { toast(app, "Indirme basarisiz") }
+                                  return@thread
+                              }
+                              val res = FileHelper.resolveGameFile(f)
+                              val p = PlatformDetector.detect(res.name)
+                              if (p == Platform.UNKNOWN) {
+                                  main.post { toast(app, "Indirilen dosya taninmadi: " + res.name) }
+                                  return@thread
+                              }
+                              val game = Game(
+                                  name = FileHelper.displayName(res.name),
+                                  filePath = res.absolutePath,
+                                  platform = p.display
+                              )
+                              vm.addGame(game) { toast(app, game.name + " kutuphaneye eklendi") }
+                          }
+                      }
+                  }
+                  ContextCompat.registerReceiver(
+                      app, r,
+                      IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                      ContextCompat.RECEIVER_EXPORTED
+                  )
+                  onDispose {
+                      try {
+                          app.unregisterReceiver(r)
+                      } catch (e: Exception) {
+                      }
+                  }
+              }
+          }
+
+          @SuppressLint("SetJavaScriptEnabled")
+          @Composable
+          fun BrowserScreen(holder: BrowserHolder) {
+              val focus = LocalFocusManager.current
+              var text by remember(holder.url) { mutableStateOf(holder.url) }
+              val go: () -> Unit = {
+                  val u = normalizeUrl(text)
+                  holder.url = u
+                  holder.webView?.loadUrl(u)
+                  focus.clearFocus()
+              }
+              Column(Modifier.fillMaxSize().padding(horizontal = 32.dp)) {
+                  Row(
+                      Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                      verticalAlignment = Alignment.CenterVertically
+                  ) {
+                      IconPill(
+                          Icons.Rounded.ArrowBackIosNew, { holder.webView?.goBack() },
+                          tint = if (holder.canBack) AC.Text else AC.Muted, size = 38.dp, sound = false
+                      )
+                      Spacer(Modifier.width(8.dp))
+                      IconPill(
+                          Icons.Rounded.ArrowForwardIos, { holder.webView?.goForward() },
+                          tint = if (holder.canForward) AC.Text else AC.Muted, size = 38.dp, sound = false
+                      )
+                      Spacer(Modifier.width(8.dp))
+                      IconPill(Icons.Rounded.Refresh, { holder.webView?.reload() }, size = 38.dp)
+                      Spacer(Modifier.width(8.dp))
+                      IconPill(Icons.Rounded.Home, {
+                          holder.url = "https://www.google.com"
+                          holder.webView?.loadUrl("https://www.google.com")
+                      }, size = 38.dp)
+                      Spacer(Modifier.width(12.dp))
+                      Row(
+                          Modifier
+                              .weight(1f)
+                              .height(38.dp)
+                              .clip(RoundedCornerShape(50))
+                              .background(AC.Glass)
+                              .border(1.dp, AC.GlassStroke, RoundedCornerShape(50))
+                              .padding(horizontal = 16.dp),
+                          verticalAlignment = Alignment.CenterVertically
+                      ) {
+                          BasicTextField(
+                              value = text,
+                              onValueChange = { text = it },
+                              singleLine = true,
+                              textStyle = TextStyle(color = AC.Text, fontSize = 13.sp),
+                              cursorBrush = SolidColor(AC.Cyan),
+                              keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go, keyboardType = KeyboardType.Uri),
+                              keyboardActions = KeyboardActions(onGo = { go() }),
+                              modifier = Modifier.fillMaxWidth()
+                          )
+                      }
+                      Spacer(Modifier.width(8.dp))
+                      IconPill(Icons.Rounded.Search, { go() }, size = 38.dp)
+                  }
+                  if (holder.loading) {
+                      ProgressBar(holder.progress, Modifier.fillMaxWidth())
+                  } else {
+                      Spacer(Modifier.height(6.dp))
+                  }
+                  Spacer(Modifier.height(6.dp))
+                  AndroidView(
+                      modifier = Modifier
+                          .weight(1f)
+                          .fillMaxWidth()
+                          .padding(bottom = 10.dp)
+                          .clip(RoundedCornerShape(16.dp)),
+                      factory = { c ->
+                          val existing = holder.webView
+                          if (existing != null) {
+                              (existing.parent as? ViewGroup)?.removeView(existing)
+                              existing
+                          } else {
+                              val wv = WebView(c)
+                              wv.settings.javaScriptEnabled = true
+                              wv.settings.domStorageEnabled = true
+                              wv.settings.loadWithOverviewMode = true
+                              wv.settings.useWideViewPort = true
+                              wv.settings.setSupportZoom(true)
+                              wv.settings.builtInZoomControls = true
+                              wv.settings.displayZoomControls = false
+                              CookieManager.getInstance().setAcceptCookie(true)
+                              wv.webViewClient = object : WebViewClient() {
+                                  override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                      holder.loading = true
+                                      if (url != null) holder.url = url
+                                  }
+
+                                  override fun onPageFinished(view: WebView?, url: String?) {
+                                      holder.loading = false
+                                      if (url != null) holder.url = url
+                                      holder.canBack = view?.canGoBack() == true
+                                      holder.canForward = view?.canGoForward() == true
+                                  }
+
+                                  override fun shouldOverrideUrlLoading(
+                                      view: WebView?,
+                                      request: WebResourceRequest?
+                                  ): Boolean {
+                                      val s = request?.url?.scheme
+                                      return !(s == "http" || s == "https")
+                                  }
+                              }
+                              wv.webChromeClient = object : WebChromeClient() {
+                                  override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                      holder.progress = newProgress / 100f
+                                  }
+                              }
+                              wv.setDownloadListener { u, ua, cd, mime, _ ->
+                                  startDownload(c, u, ua, cd, mime)
+                              }
+                              wv.loadUrl(holder.url)
+                              holder.webView = wv
+                              wv
+                          }
+                      }
+                  )
+              }
+          }
+          EOF
+
+          cat << 'EOF' > app/src/main/java/com/allcore/emulator/ui/AllCoreApp.kt
+          package com.allcore.emulator.ui
+
+          import androidx.activity.compose.BackHandler
+          import androidx.compose.animation.AnimatedContent
+          import androidx.compose.animation.Crossfade
+          import androidx.compose.animation.fadeIn
+          import androidx.compose.animation.fadeOut
+          import androidx.compose.animation.scaleIn
+          import androidx.compose.animation.slideInHorizontally
+          import androidx.compose.animation.core.tween
+          import androidx.compose.animation.togetherWith
+          import androidx.compose.foundation.layout.Box
+          import androidx.compose.foundation.layout.Column
+          import androidx.compose.foundation.layout.displayCutoutPadding
+          import androidx.compose.foundation.layout.fillMaxSize
+          import androidx.compose.runtime.Composable
+          import androidx.compose.runtime.LaunchedEffect
+          import androidx.compose.runtime.collectAsState
+          import androidx.compose.runtime.getValue
+          import androidx.compose.runtime.mutableIntStateOf
+          import androidx.compose.runtime.mutableStateOf
+          import androidx.compose.runtime.remember
+          import androidx.compose.runtime.setValue
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.platform.LocalContext
+          import com.allcore.emulator.data.GameViewModel
+          import com.allcore.emulator.util.AmbientMusic
+          import com.allcore.emulator.util.Prefs
+          import com.allcore.emulator.util.Sfx
+          import com.allcore.emulator.util.toast
+
+          sealed class Screen {
+              object Home : Screen()
+              object Add : Screen()
+              data class Detail(val id: Long) : Screen()
+          }
+
+          @Composable
+          fun AllCoreApp(vm: GameViewModel) {
+              val ctx = LocalContext.current
+              val games by vm.games.collectAsState()
+              var splash by remember { mutableStateOf(true) }
+              var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+              var tab by remember { mutableStateOf(NavTab.HOME) }
+              var sel by remember { mutableIntStateOf(0) }
+              var accent by remember { mutableStateOf(AC.Blue) }
+              var musicOn by remember { mutableStateOf(Prefs.music(ctx)) }
+              val browser = remember { BrowserHolder() }
+
+              DownloadWatcher(vm)
+
+              LaunchedEffect(tab, screen) {
+                  if (screen == Screen.Home && tab != NavTab.HOME) accent = AC.Blue
+              }
+
+              BackHandler(enabled = !splash && (screen != Screen.Home || tab != NavTab.HOME)) {
+                  if (screen != Screen.Home) {
+                      Sfx.back()
+                      screen = Screen.Home
+                  } else if (tab == NavTab.BROWSER && browser.webView?.canGoBack() == true) {
+                      browser.webView?.goBack()
+                  } else {
+                      Sfx.back()
+                      tab = NavTab.HOME
+                  }
+              }
+
+              Box(Modifier.fillMaxSize()) {
+                  AnimatedBackground(accent)
+                  Crossfade(targetState = splash, animationSpec = tween(600), label = "splash") { s ->
+                      if (s) {
+                          SplashScreen { splash = false }
+                      } else {
+                          Box(Modifier.fillMaxSize().displayCutoutPadding()) {
+                              AnimatedContent(
+                                  targetState = screen,
+                                  transitionSpec = {
+                                      (fadeIn(tween(350)) + scaleIn(tween(350), initialScale = 0.96f)) togetherWith
+                                          fadeOut(tween(200))
+                                  },
+                                  label = "screen"
+                              ) { sc ->
+                                  when (sc) {
+                                      is Screen.Home -> Column(Modifier.fillMaxSize()) {
+                                          TopNav(tab, musicOn) { t ->
+                                              if (t != tab) {
+                                                  Sfx.move()
+                                                  tab = t
+                                              }
+                                          }
+                                          Box(Modifier.weight(1f).fillMaxSize()) {
+                                              AnimatedContent(
+                                                  targetState = tab,
+                                                  transitionSpec = {
+                                                      (fadeIn(tween(350)) + slideInHorizontally(tween(350)) { it / 10 }) togetherWith
+                                                          fadeOut(tween(200))
+                                                  },
+                                                  label = "tab"
+                                              ) { t ->
+                                                  when (t) {
+                                                      NavTab.HOME -> LibraryScreen(
+                                                          games = games,
+                                                          selIndex = sel,
+                                                          onSel = { sel = it },
+                                                          onOpen = { g -> screen = Screen.Detail(g.id) },
+                                                          onAdd = { screen = Screen.Add },
+                                                          onToggleFav = { g -> vm.updateGame(g.copy(favorite = !g.favorite)) },
+                                                          onAccent = { accent = it }
+                                                      )
+                                                      NavTab.CONSOLES -> ConsolesScreen()
+                                                      NavTab.BROWSER -> BrowserScreen(browser)
+                                                      NavTab.SETTINGS -> SettingsScreen(games.size) { musicOn = it }
+                                                  }
+                                              }
+                                          }
+                                      }
+                                      is Screen.Add -> AddGameScreen(
+                                          vm = vm,
+                                          onBack = { screen = Screen.Home },
+                                          onSaved = { id ->
+                                              sel = 0
+                                              screen = Screen.Detail(id)
+                                          },
+                                          onAccent = { accent = it }
+                                      )
+                                      is Screen.Detail -> {
+                                          val g = games.firstOrNull { it.id == sc.id }
+                                          if (g == null) {
+                                              LaunchedEffect(Unit) { screen = Screen.Home }
+                                          } else {
+                                              GameDetailScreen(
+                                                  game = g,
+                                                  onBack = { screen = Screen.Home },
+                                                  onToggleFav = { vm.updateGame(g.copy(favorite = !g.favorite)) },
+                                                  onDelete = {
+                                                      vm.deleteGame(g)
+                                                      sel = 0
+                                                      screen = Screen.Home
+                                                      toast(ctx, "Oyun kutuphaneden silindi")
+                                                  },
+                                                  onAccent = { accent = it }
+                                              )
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AllCore-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
