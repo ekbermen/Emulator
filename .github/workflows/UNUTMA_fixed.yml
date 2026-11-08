@@ -12,9 +12,10 @@ jobs:
     with:
      distribution: temurin
      java-version: '17'
-  - uses: gradle/actions/setup-gradle@v3
+     - uses: gradle/actions/setup-gradle@v3
     with:
-     gradle-version: '8.5'
+      gradle-version: '8.5'
+      cache-disabled: true
   - name: Create AllCore project files
     run: |
      mkdir -p app/src/main/{java/com/allcore/emulator/{data,emulator,ui,util},res/{drawable,values,xml},assets}
